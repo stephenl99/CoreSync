@@ -17,3 +17,10 @@ $ ./init_submodules.sh
 ```
 $ ./setup_remote_xl170.py
 ```
+
+4. Start experiment script
+
+For a synthetic experiment:
+```
+$ ./run_synthetic.py
+```
