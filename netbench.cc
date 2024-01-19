@@ -1165,7 +1165,34 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
     reject_p50 = rejected[(reject_cnt - 1) * 0.5].duration_us;
     reject_p99 = rejected[(reject_cnt - 1) * 0.99].duration_us;
   }
-
+  ///// ERIC
+  // ordering by start times
+  std::sort(w.begin(), w.end(), [](const work_unit &s1, const work_unit &s2) {
+    return s1.start_us < s2.start_us;
+  });
+  
+  /*
+  work unit struct:
+    double start_us, work_us, duration_us;
+    int hash;
+    bool success;
+    bool is_monster;
+    uint64_t credit;
+    uint64_t tsc;
+    uint32_t cpu;
+    uint64_t server_queue;
+    uint64_t server_time;
+    uint64_t timing;
+  */
+  std::ofstream all_tasks_file;
+  all_tasks_file.open ("all_tasks.csv");
+  all_tasks_file << "start_us,work_us,duration_us,tsc,server_queue,server_time" << std::endl;
+  for (unsigned int i = 0; i < wsize; ++i) {
+    all_tasks_file << w[i].start_us << "," << w[i].work_us << "," << w[i].duration_us << ","
+                   << w[i].tsc << "," << w[i].server_queue << "," << w[i].server_time << std::endl;
+  }
+  all_tasks_file.close();
+  ///// END ERIC
   w.erase(std::remove_if(w.begin(), w.end(),
 			 [](const work_unit &s) {
 			   return !s.success;
@@ -1645,7 +1672,7 @@ int main(int argc, char *argv[]) {
   total_agents += std::stoi(argv[8], nullptr, 0);
   offered_load = std::stod(argv[9], nullptr);
 
-  num_servers = argc - 10;
+  num_servers = argc - 10; // does this make any sense?
   if (num_servers % 2 != 0) {
     print_client_usage();
     return -EINVAL;
@@ -1656,6 +1683,12 @@ int main(int argc, char *argv[]) {
     std::cerr << "[Warning] the number of server exceeds 16."
 	      << std::endl;
     num_servers = 16;
+  }
+
+  if (num_servers != 1) {
+    std::cerr << "[Error] num_servers is not equal to 1. Unsure if what happens if it isn't equal to 1"
+              << endl;
+    return -EINVAL;
   }
 
   for(i = 0; i < num_servers; ++i) {
