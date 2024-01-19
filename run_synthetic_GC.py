@@ -38,7 +38,7 @@ ENABLE_DIRECTPATH = True
 SPIN_SERVER = False
 DISABLE_WATCHDOG = False
 
-NUM_CORES_SERVER = 4
+NUM_CORES_SERVER = 16 # should this be 18 or 16? I think somewhere in caladan-all they do max cores-2, why is this?
 NUM_CORES_CLIENT = 16
 
 ############################
@@ -195,10 +195,15 @@ execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Execute IOKernel
 iok_sessions = []
-print("Executing IOKernel...")
-cmd = "cd ~/{}/shenango && sudo ./iokerneld".format(ARTIFACT_PATH)
-iok_sessions += execute_remote([server_conn, client_conn] + agent_conns,
-                               cmd, False)
+print("starting server IOKernel")
+cmd = "cd ~/{} && sudo ./caladan/iokerneld ias"\
+    " 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18  2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH)
+iok_sessions += execute_remote([server_conn], cmd, False)
+
+print("starting client IOKernel")
+cmd = "cd ~/{} && sudo ./caladan/iokerneld simple 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18"\
+    " 2>&1 | ts %s > iokernel.node-1.log".format(ARTIFACT_PATH)
+iok_sessions += execute_remote([client_conn], cmd, False)
 
 sleep(1)
 

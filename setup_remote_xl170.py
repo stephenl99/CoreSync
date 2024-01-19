@@ -8,7 +8,7 @@ k = paramiko.RSAKey.from_private_key_file(KEY_LOCATION)
 
 # config check
 if len(NODES) < 1:
-    printf("[ERROR] There is no server to configure.")
+    print("[ERROR] There is no server to configure.")
     exit()
 
 # change default shell to bash
@@ -77,10 +77,10 @@ cmd = "cd ~/{}/shenango/breakwater && make clean && make -j16 &&"\
         " make -C bindings/cc".format(ARTIFACT_PATH)
 execute_remote(conns, cmd, True)
 
-print("Setting up memcahced...")
-cmd = "cd ~/{}/shenango-memcached && ./version.sh && autoreconf -i"\
-        " && ./configure --with-shenango=../shenango"\
-        .format(ARTIFACT_PATH)
-execute_remote(conns, cmd, True)
+# print("Setting up memcahced...")
+# cmd = "cd ~/{}/shenango-memcached && ./version.sh && autoreconf -i"\
+#         " && ./configure --with-shenango=../shenango"\
+#         .format(ARTIFACT_PATH)
+# execute_remote(conns, cmd, True)
 
 print("Done.")
