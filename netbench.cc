@@ -1187,7 +1187,7 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
   std::ofstream all_tasks_file;
   all_tasks_file.open ("all_tasks.csv");
   all_tasks_file << "start_us,work_us,duration_us,tsc,server_queue,server_time" << std::endl;
-  for (unsigned int i = 0; i < wsize; ++i) {
+  for (unsigned int i = 0; i < w.size(); ++i) {
     all_tasks_file << w[i].start_us << "," << w[i].work_us << "," << w[i].duration_us << ","
                    << w[i].tsc << "," << w[i].server_queue << "," << w[i].server_time << std::endl;
   }
@@ -1687,7 +1687,7 @@ int main(int argc, char *argv[]) {
 
   if (num_servers != 1) {
     std::cerr << "[Error] num_servers is not equal to 1. Unsure if what happens if it isn't equal to 1"
-              << endl;
+              << std::endl;
     return -EINVAL;
   }
 

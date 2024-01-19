@@ -5,6 +5,7 @@ import os
 from time import sleep
 from util import *
 from config_remote import *
+from datetime import datetime
 
 ################################
 ### Experiemnt Configuration ###
@@ -29,7 +30,8 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
 
-OFFERED_LOADS = [400000, 800000, 1200000]
+# OFFERED_LOADS = [400000, 800000, 1200000]
+OFFERED_LOADS = [800000]
 
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] *= 10000
@@ -294,10 +296,21 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:ecredit_rx_pps,client:cupdate_tx_pps"\
         ",client:resp_rx_pps,client:req_tx_pps"\
         ",client:credit_expired_cps,client:req_dropped_rps"
-cmd = "echo \"{}\" > outputs/{}.csv".format(header, output_prefix)
+
+curr_date = datetime.now().strftime("%d_%m_%Y")
+curr_time = datetime.now().strftime("%H_%M-")
+output_dir = "outputs/{}".format(curr_date)
+if not os.path.isdir(output_dir):
+   os.makedirs(output_dir)
+
+cmd = "echo \"{}\" > {}/{}.csv".format(header, output_dir, curr_time + output_prefix)
 execute_local(cmd)
 
-cmd = "cat output.csv >> outputs/{}.csv".format(output_prefix)
+cmd = "cat output.csv >> {}/{}.csv".format(output_dir, curr_time + output_prefix)
+execute_local(cmd)
+cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
+            " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
 execute_local(cmd)
 
 # Remove temp outputs
