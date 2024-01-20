@@ -43,6 +43,8 @@ DISABLE_WATCHDOG = False
 NUM_CORES_SERVER = 4
 NUM_CORES_CLIENT = 16
 
+DOWNLOAD_RAW = False
+
 ############################
 ### End of configuration ###
 ############################
@@ -308,10 +310,13 @@ execute_local(cmd)
 
 cmd = "cat output.csv >> {}/{}.csv".format(output_dir, curr_time + output_prefix)
 execute_local(cmd)
-cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
-            " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
-execute_local(cmd)
+
+if DOWNLOAD_RAW:
+    print("Fetching raw output (all non rejected tasks)")
+    cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+                " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
+                " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
+    execute_local(cmd)
 
 # Remove temp outputs
 cmd = "rm output.csv"
