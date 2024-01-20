@@ -50,37 +50,37 @@ repo_name = (os.getcwd().split('/'))[-1]
 # - server
 for server in NODES:
     cmd = "rsync -azh -e \"ssh -i {} -o StrictHostKeyChecking=no"\
-            " -o UserKnownHostsFile=/dev/null\" --progress ../{}/"\
+            " -o UserKnownHostsFile=/dev/null\" --progress --exclude outputs/ ../{}/"\
             " {}@{}:~/{} >/dev/null"\
             .format(KEY_LOCATION, repo_name, USERNAME, server, ARTIFACT_PATH)
     execute_local(cmd)
 
 # install sub-modules
 print("Building submodules... (it may take a few mintues)")
-cmd = "cd ~/{}/shenango && make submodules -j16".format(ARTIFACT_PATH)
+cmd = "cd ~/{}/{} && make submodules -j16".format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
-# build shenango
-print("Building Shenango...")
-cmd = "cd ~/{}/shenango && make clean && make -j16 && make -C bindings/cc"\
-        .format(ARTIFACT_PATH)
+# build caladan/shenango
+print("Building caladan/shenango...")
+cmd = "cd ~/{}/{} && make clean && make -j16 && make -C bindings/cc"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
 # settting up machines
 print("Setting up machines...")
-cmd = "cd ~/{}/shenango/breakwater && sudo ./scripts/setup_machine.sh"\
-        .format(ARTIFACT_PATH)
+cmd = "cd ~/{}/{}/breakwater && sudo ./scripts/setup_machine.sh"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
 print("Building Breakwater...")
-cmd = "cd ~/{}/shenango/breakwater && make clean && make -j16 &&"\
-        " make -C bindings/cc".format(ARTIFACT_PATH)
+cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 &&"\
+        " make -C bindings/cc".format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
 # print("Setting up memcahced...")
 # cmd = "cd ~/{}/shenango-memcached && ./version.sh && autoreconf -i"\
-#         " && ./configure --with-shenango=../shenango"\
-#         .format(ARTIFACT_PATH)
+#         " && ./configure --with-shenango=../{}"\
+#         .format(ARTIFACT_PATH, KERNEL_NAME)
 # execute_remote(conns, cmd, True)
 
 print("Done.")

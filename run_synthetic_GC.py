@@ -5,6 +5,7 @@ import os
 from time import sleep
 from util import *
 from config_remote import *
+from datetime import datetime
 
 ################################
 ### Experiemnt Configuration ###
@@ -29,7 +30,8 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
 
-OFFERED_LOADS = [400000, 800000, 1200000]
+# OFFERED_LOADS = [400000, 800000, 1200000]
+OFFERED_LOADS = [800000]
 
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] *= 10000
@@ -38,7 +40,7 @@ ENABLE_DIRECTPATH = True
 SPIN_SERVER = False
 DISABLE_WATCHDOG = False
 
-NUM_CORES_SERVER = 16 # should this be 18 or 16? I think somewhere in caladan-all they do max cores-2, why is this?
+NUM_CORES_SERVER = 4
 NUM_CORES_CLIENT = 16
 
 ############################
@@ -102,7 +104,7 @@ netmask = "255.255.255.0"
 gateway = "192.168.1.1"
 
 for i in range(NUM_AGENT):
-    agent_ip = "192.168.1." + str(101 + i);
+    agent_ip = "192.168.1." + str(101 + i)
     agent_ips.append(agent_ip)
 
 k = paramiko.RSAKey.from_private_key_file(KEY_LOCATION)
@@ -141,28 +143,28 @@ repo_name = (os.getcwd().split('/'))[-1]
 # - server
 for server in NODES:
     cmd = "rsync -azh -e \"ssh -i {} -o StrictHostKeyChecking=no"\
-            " -o UserKnownHostsFile=/dev/null\" --progress ../{}/shenango/"\
-            " {}@{}:~/{}/shenango >/dev/null"\
-            .format(KEY_LOCATION, repo_name, USERNAME, server, ARTIFACT_PATH)
+            " -o UserKnownHostsFile=/dev/null\" --progress --exclude outputs/ ../{}/{}/"\
+            " {}@{}:~/{}/{} >/dev/null"\
+            .format(KEY_LOCATION, repo_name, KERNEL_NAME, USERNAME, server, ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
 # Distribuing config files
 print("Distributing configs...")
 # - server
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
-        " {}@{}:~/{}/shenango/breakwater/src/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH)
+        " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
+        .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
 # - client
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
-        " {}@{}:~/{}/shenango/breakwater/src/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH)
+        " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
+        .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
 # - agents
 for agent in AGENTS:
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
-            " {}@{}:~/{}/shenango/breakwater/src/ >/dev/null"\
-            .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH)
+            " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
+            .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
 # Generating config files
@@ -176,34 +178,29 @@ for i in range(NUM_AGENT):
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
 # Rebuild Shanango
-print("Building Shenango...")
-cmd = "cd ~/{}/shenango && make clean && make && make -C bindings/cc"\
-        .format(ARTIFACT_PATH)
+print("Building Shenango/Caladan...")
+cmd = "cd ~/{}/{} && make clean && make && make -C bindings/cc"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Build Breakwater
 print("Building Breakwater...")
-cmd = "cd ~/{}/shenango/breakwater && make clean && make && make -C bindings/cc"\
-        .format(ARTIFACT_PATH)
+cmd = "cd ~/{}/{}/breakwater && make clean && make && make -C bindings/cc"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Build Netbench
 print("Building netbench...")
-cmd = "cd ~/{}/shenango/breakwater/apps/netbench && make clean && make"\
-        .format(ARTIFACT_PATH)
+cmd = "cd ~/{}/{}/breakwater/apps/netbench && make clean && make"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Execute IOKernel
 iok_sessions = []
-print("starting server IOKernel")
-cmd = "cd ~/{} && sudo ./caladan/iokerneld ias"\
-    " 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18  2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH)
-iok_sessions += execute_remote([server_conn], cmd, False)
-
-print("starting client IOKernel")
-cmd = "cd ~/{} && sudo ./caladan/iokerneld simple 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18"\
-    " 2>&1 | ts %s > iokernel.node-1.log".format(ARTIFACT_PATH)
-iok_sessions += execute_remote([client_conn], cmd, False)
+print("Executing IOKernel...")
+cmd = "cd ~/{}/{} && sudo ./iokerneld".format(ARTIFACT_PATH, KERNEL_NAME)
+iok_sessions += execute_remote([server_conn, client_conn] + agent_conns,
+                               cmd, False)
 
 sleep(1)
 
@@ -212,9 +209,9 @@ for offered_load in OFFERED_LOADS:
     # Execute netbench application
     # - server
     print("\tExecuting server...")
-    cmd = "cd ~/{} && sudo ./shenango/breakwater/apps/netbench/netbench"\
+    cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} server.config server >stdout.out 2>&1"\
-            .format(ARTIFACT_PATH, OVERLOAD_ALG)
+            .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG)
     server_session = execute_remote([server_conn], cmd, False)
     server_session = server_session[0]
     
@@ -223,9 +220,9 @@ for offered_load in OFFERED_LOADS:
     # - client
     print("\tExecuting client...")
     client_agent_sessions = []
-    cmd = "cd ~/{} && sudo ./shenango/breakwater/apps/netbench/netbench"\
+    cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} client.config client {:d} {:f} {} {:d} {:d} {:d} {} {:d}"\
-            " >stdout.out 2>&1".format(ARTIFACT_PATH, OVERLOAD_ALG, NUM_CONNS,
+            " >stdout.out 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, NUM_CONNS,
                     ST_AVG, ST_DIST, slo ,NUM_AGENT, offered_load, server_ip, 1)
     client_agent_sessions += execute_remote([client_conn], cmd, False)
 
@@ -233,9 +230,9 @@ for offered_load in OFFERED_LOADS:
     
     # - agent
     print("\tExecuting agents...")
-    cmd = "cd ~/{} && sudo ./shenango/breakwater/apps/netbench/netbench"\
+    cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} client.config agent {} >stdout.out 2>&1"\
-            .format(ARTIFACT_PATH, OVERLOAD_ALG, client_ip)
+            .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, client_ip)
     client_agent_sessions += execute_remote(agent_conns, cmd, False)
 
     # Wait for client and agents
@@ -299,10 +296,21 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:ecredit_rx_pps,client:cupdate_tx_pps"\
         ",client:resp_rx_pps,client:req_tx_pps"\
         ",client:credit_expired_cps,client:req_dropped_rps"
-cmd = "echo \"{}\" > outputs/{}.csv".format(header, output_prefix)
+
+curr_date = datetime.now().strftime("%d_%m_%Y")
+curr_time = datetime.now().strftime("%H_%M-")
+output_dir = "outputs/{}".format(curr_date)
+if not os.path.isdir(output_dir):
+   os.makedirs(output_dir)
+
+cmd = "echo \"{}\" > {}/{}.csv".format(header, output_dir, curr_time + output_prefix)
 execute_local(cmd)
 
-cmd = "cat output.csv >> outputs/{}.csv".format(output_prefix)
+cmd = "cat output.csv >> {}/{}.csv".format(output_dir, curr_time + output_prefix)
+execute_local(cmd)
+cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
+            " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
 execute_local(cmd)
 
 # Remove temp outputs
