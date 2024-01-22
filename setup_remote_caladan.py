@@ -50,19 +50,19 @@ repo_name = (os.getcwd().split('/'))[-1]
 # - server
 for server in NODES:
     cmd = "rsync -azh -e \"ssh -i {} -o StrictHostKeyChecking=no"\
-            " -o UserKnownHostsFile=/dev/null\" --progress --exclude outputs/ ../{}/"\
-            " {}@{}:~/{} >/dev/null"\
+            " -o UserKnownHostsFile=/dev/null\" --info=progress2 --exclude outputs/ ../{}/"\
+            " {}@{}:~/{}"\
             .format(KEY_LOCATION, repo_name, USERNAME, server, ARTIFACT_PATH)
     execute_local(cmd)
 
 # excute caladan build scripts
 print("Executing caladan build all and build client scripts for main server node. Will make submodules and most components.")
 cmd = "cd ~/{}/{} && ./build_all.sh >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
-execute_remote(server_conn, cmd, True)
+execute_remote([server_conn], cmd, True)
 
 print("Executing caladan build client script for other connections")
 cmd = "cd ~/{}/{} && ./build_client.sh >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
-execute_remote(server_conn, cmd, True)
+execute_remote([server_conn], cmd, True)
 
 # settting up machines
 # NOTE Inho has his own setup script here, it does also call the caladan setup script
