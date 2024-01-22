@@ -57,23 +57,23 @@ for server in NODES:
 
 # excute caladan build scripts
 print("Executing caladan build all and build client scripts for main server node. Will make submodules and most components.")
-cmd = "cd ~/{}/{} && ./build_all.sh".format(ARTIFACT_PATH, KERNEL_NAME)
+cmd = "cd ~/{}/{} && ./build_all.sh >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
 execute_remote(server_conn, cmd, True)
 
 print("Executing caladan build client script for other connections")
-cmd = "cd ~/{}/{} && ./build_client.sh".format(ARTIFACT_PATH, KERNEL_NAME)
+cmd = "cd ~/{}/{} && ./build_client.sh >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
 execute_remote(server_conn, cmd, True)
 
 # settting up machines
 # NOTE Inho has his own setup script here, it does also call the caladan setup script
 print("Setting up machines...")
-cmd = "cd ~/{}/{}/breakwater && sudo ./scripts/setup_machine.sh"\
-        .format(ARTIFACT_PATH, KERNEL_NAME)
+cmd = "cd ~/{}/{}/breakwater && sudo ./scripts/setup_machine.sh >> {} 2>&1"\
+        .format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
 execute_remote(conns, cmd, True)
 
 print("Building Breakwater...")
-cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 &&"\
-        " make -C bindings/cc".format(ARTIFACT_PATH, KERNEL_NAME)
+cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 >> {} 2>&1 &&"\
+        " make -C bindings/cc >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG, COMMAND_DEBUG)
 execute_remote(conns, cmd, True)
 
 # print("Setting up memcahced...")
