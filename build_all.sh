@@ -20,23 +20,23 @@ done
 
 export SHENANGODIR=$SCRIPTPATH/caladan
 
-echo building SILO
-pushd  silo
-./silo.sh
-make
-popd
+# echo building SILO
+# pushd  silo
+# ./silo.sh
+# make
+# popd
 
-echo building MEMCACHED
-pushd memcached
-./autogen.sh
-./configure --with-shenango=$SCRIPTPATH/caladan
-make
-popd
-pushd memcached-linux
-./autogen.sh
-./configure
-make
-popd
+# echo building MEMCACHED
+# pushd memcached
+# ./autogen.sh
+# ./configure --with-shenango=$SCRIPTPATH/caladan
+# make
+# popd
+# pushd memcached-linux
+# ./autogen.sh
+# ./configure
+# make
+# popd
 
 echo building BOEHMGC
 pushd gc
