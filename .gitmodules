@@ -1,5 +1,5 @@
 [submodule "shenango"]
-	path = shenango
+	path = caladan
 	url = git@github.com:inhocho89/shenango-protego.git
   branch = protego
 [submodule "gc"]
