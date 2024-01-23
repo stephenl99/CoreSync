@@ -1,10 +1,10 @@
-[submodule "shenango"]
-	path = shenango
-	url = git@github.com:inhocho89/shenango-protego.git
-  branch = protego
 [submodule "gc"]
 	path = gc
 	url = https://github.com/shenango/boehmGC.git
 [submodule "parsec"]
 	path = parsec
 	url = https://github.com/shenango/parsec.git
+[submodule "caladan"]
+	path = caladan
+	url = https://github.com/inhocho89/shenango-protego.git
+	branch = protego
