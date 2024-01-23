@@ -26,12 +26,17 @@ for conn in conns:
     conn.close()
 
 # connections to servers
+server_conn = paramiko.SSHClient()
+server_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+server_conn.connect(hostname = SERVERS[0], username = USERNAME, pkey = k)
+
 conns = []
-for server in NODES:
-    server_conn = paramiko.SSHClient()
-    server_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    server_conn.connect(hostname = server, username = USERNAME, pkey = k)
-    conns.append(server_conn)
+conns.append(server_conn)
+for node in CLIENTS:
+    node_conn = paramiko.SSHClient()
+    node_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    node_conn.connect(hostname = node, username = USERNAME, pkey = k)
+    conns.append(node_conn)
 
 # clean up machines
 print("Cleaning up machines...")
@@ -55,25 +60,36 @@ for server in NODES:
             .format(KEY_LOCATION, repo_name, USERNAME, server, ARTIFACT_PATH)
     execute_local(cmd)
 
+print("Installing listed Caladan dependencies")
+cmd = "sudo apt-get update"
+execute_remote(conns, cmd, True)
+
+cmd = "sudo apt-get -y install build-essential libnuma-dev clang autoconf"\
+        " autotools-dev m4 automake libevent-dev  libpcre++-dev libtool"\
+        " ragel libev-dev moreutils parallel cmake python3 python3-pip"\
+        " libjemalloc-dev libaio-dev libdb5.3++-dev numactl hwloc libmnl-dev"\
+        " libnl-3-dev libnl-route-3-dev uuid-dev libssl-dev libcunit1-dev pkg-config"
+execute_remote(conns, cmd, True)
+
 # excute caladan build scripts
 print("Executing caladan build all and build client scripts for main server node. Will make submodules and most components.")
-cmd = "cd ~/{}/{} && ./build_all.sh >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
+cmd = "cd ~/{} && ./build_all.sh".format(ARTIFACT_PATH)
 execute_remote([server_conn], cmd, True)
 
 print("Executing caladan build client script for other connections")
-cmd = "cd ~/{}/{} && ./build_client.sh >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
-execute_remote([server_conn], cmd, True)
+cmd = "cd ~/{} && ./build_client.sh".format(ARTIFACT_PATH)
+execute_remote(conns[1:], cmd, True)
 
 # settting up machines
 # NOTE Inho has his own setup script here, it does also call the caladan setup script
 print("Setting up machines...")
-cmd = "cd ~/{}/{}/breakwater && sudo ./scripts/setup_machine.sh >> {} 2>&1"\
-        .format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG)
+cmd = "cd ~/{}/{}/breakwater && sudo ./scripts/setup_machine.sh"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
 print("Building Breakwater...")
-cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 >> {} 2>&1 &&"\
-        " make -C bindings/cc >> {} 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, COMMAND_DEBUG, COMMAND_DEBUG)
+cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 &&"\
+        " make -C bindings/cc".format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
 # print("Setting up memcahced...")
