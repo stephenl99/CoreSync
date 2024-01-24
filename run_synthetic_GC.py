@@ -142,7 +142,8 @@ for agent in AGENTS:
 
 # Clean-up environment
 print("Cleaning up machines...")
-cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld"
+cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld && sudo killall -9 stress_shm_query"\
+      " && sudo killall -9 swaptions"
 execute_remote([server_conn, client_conn] + agent_conns,
                cmd, True, False)
 sleep(1)
@@ -269,7 +270,7 @@ for offered_load in OFFERED_LOADS:
     cmd = "cd ~ && echo netbench > PID.txt && pidof netbench >> PID.txt"
     execute_remote([server_conn], cmd, True)
     cmd = "cd ~ && echo swaptions >> PID.txt && pidof swaptions >> PID.txt"
-    execute_remote([server_conn], cmd, True)
+    # execute_remote([server_conn], cmd, True)
     cmd = "cd ~ && echo iokerneld >> PID.txt && pidof iokerneld >> PID.txt"
     execute_remote([server_conn], cmd, True)
     cmd = "cd ~ && echo stress_shm_query >> PID.txt && pidof stress_shm_query >> PID.txt"
@@ -316,7 +317,7 @@ for offered_load in OFFERED_LOADS:
     # kill swaptions
     print("killing swaptions")
     cmd = "sudo killall -9 swaptions"
-    execute_remote([server_conn], cmd, True)
+    execute_remote([server_conn], cmd, True, False) # TODO
     server_swaptions_session[0].recv_exit_status()
 
     sleep(1)
@@ -383,7 +384,7 @@ execute_local(cmd)
 cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
             " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
             " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
-execute_local(cmd)
+# execute_local(cmd) # TODO
 
 # Remove temp outputs
 cmd = "rm output.csv"
