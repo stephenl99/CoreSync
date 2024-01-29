@@ -1165,6 +1165,12 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
     reject_p50 = rejected[(reject_cnt - 1) * 0.5].duration_us;
     reject_p99 = rejected[(reject_cnt - 1) * 0.99].duration_us;
   }
+
+  w.erase(std::remove_if(w.begin(), w.end(),
+			 [](const work_unit &s) {
+			   return !s.success;
+	}), w.end());
+
   ///// ERIC
   // ordering by start times
   std::sort(w.begin(), w.end(), [](const work_unit &s1, const work_unit &s2) {
@@ -1193,10 +1199,6 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
   }
   all_tasks_file.close();
   ///// END ERIC
-  w.erase(std::remove_if(w.begin(), w.end(),
-			 [](const work_unit &s) {
-			   return !s.success;
-	}), w.end());
 
   std::sort(w.begin(), w.end(), [](const work_unit &s1, const work_unit &s2) {
     return s1.duration_us < s2.duration_us;

@@ -6,6 +6,7 @@ from time import sleep
 from util import *
 from config_remote import *
 from datetime import datetime
+import random
 
 ################################
 ### Experiemnt Configuration ###
@@ -40,10 +41,27 @@ ENABLE_DIRECTPATH = True
 SPIN_SERVER = False
 DISABLE_WATCHDOG = False
 
-NUM_CORES_SERVER = 4
+NUM_CORES_SERVER = 18
 NUM_CORES_CLIENT = 16
 
-DOWNLOAD_RAW = False
+CALADAN_THRESHOLD = 10
+
+DOWNLOAD_RAW = True
+
+ENABLE_ANTAGONIST = True
+# number of threads for antagonist
+threads = 10
+# units of work each thread attempts at once
+work_units = 10
+# config string describing what type of antagonist worker, and other variables
+# ex. random mem, cache, strided mem, etc. Also control size of buffer and other per worker variables.
+# Doing this for max val of an unsigned 32 bit int
+random_seed = random.randint(0, 4294967295)
+# this was the size of the cache antagonist example from the repo. Seems to be close to a possible L1 size (a big L1 at least)
+antagonist_mem_size = 4090880
+# cacheantagonist:4090880
+# randmem:69:seed
+antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 
 ############################
 ### End of configuration ###
@@ -65,7 +83,7 @@ if ST_DIST not in ["exp", "const", "bimod"]:
 
 ### Function definitions ###
 def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
-        directpath, spin, disable_watchdog):
+        directpath, spin, disable_watchdog, latency_critical=False, guaranteed_kthread=0, antagonist="none"):
     config_name = ""
     config_string = ""
     if is_server:
@@ -74,15 +92,27 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
                       + "\nhost_netmask {}".format(netmask)\
                       + "\nhost_gateway {}".format(gateway)\
                       + "\nruntime_kthreads {:d}".format(num_cores)
+        if latency_critical:
+            config_string += "\nruntime_priority lc"
+        else:
+            config_string += "\nruntime_priority be"
+        config_string += "\nruntime_guaranteed_kthreads {:d}".format(guaranteed_kthread)
+        config_string += "\nruntime_qdelay_us {:d}".format(CALADAN_THRESHOLD)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
                       + "\nhost_netmask {}".format(netmask)\
                       + "\nhost_gateway {}".format(gateway)\
                       + "\nruntime_kthreads {:d}".format(num_cores)
+    
+    if antagonist != "none":
+        config_name = antagonist
+        # config_string += "\nenable_gc 1"
 
     if spin:
         config_string += "\nruntime_spinning_kthreads {:d}".format(num_cores)
+    else:
+        config_string += "\nruntime_spinning_kthreads 0"
 
     if directpath:
         config_string += "\nenable_directpath 1"
@@ -99,6 +129,8 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
 NUM_AGENT = len(AGENTS)
 
 # configure Shenango IPs for config
+# TODO does each app on shenango need a unique server ip?
+antagonist_ip = "192.168.1.7"
 server_ip = "192.168.1.200"
 client_ip = "192.168.1.100"
 agent_ips = []
@@ -130,7 +162,8 @@ for agent in AGENTS:
 
 # Clean-up environment
 print("Cleaning up machines...")
-cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld"
+cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld && sudo killall -9 stress_shm_query"\
+      " && sudo killall -9 stress"
 execute_remote([server_conn, client_conn] + agent_conns,
                cmd, True, False)
 sleep(1)
@@ -138,17 +171,6 @@ sleep(1)
 # Remove temporary output
 cmd = "cd ~/{} && rm output.csv output.json".format(ARTIFACT_PATH)
 execute_remote([client_conn], cmd, True, False)
-
-# Distributing sources
-print("Distributing sources...")
-repo_name = (os.getcwd().split('/'))[-1]
-# - server
-for server in NODES:
-    cmd = "rsync -azh -e \"ssh -i {} -o StrictHostKeyChecking=no"\
-            " -o UserKnownHostsFile=/dev/null\" --progress --exclude outputs/ ../{}/{}/"\
-            " {}@{}:~/{}/{} >/dev/null"\
-            .format(KEY_LOCATION, repo_name, KERNEL_NAME, USERNAME, server, ARTIFACT_PATH, KERNEL_NAME)
-    execute_local(cmd)
 
 # Distribuing config files
 print("Distributing configs...")
@@ -172,7 +194,11 @@ for agent in AGENTS:
 # Generating config files
 print("Generating config files...")
 generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
-                         NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG)
+                         NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
+                         latency_critical=True, guaranteed_kthread=16)
+generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
+                         NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
+                         latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
 generate_shenango_config(False, client_conn, client_ip, netmask, gateway,
                          NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 for i in range(NUM_AGENT):
@@ -206,14 +232,44 @@ execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Execute IOKernel
 iok_sessions = []
-print("Executing IOKernel...")
-cmd = "cd ~/{}/{} && sudo ./iokerneld".format(ARTIFACT_PATH, KERNEL_NAME)
-iok_sessions += execute_remote([server_conn, client_conn] + agent_conns,
-                               cmd, False)
+print("starting server IOKernel")
+cmd = "cd ~/{}/{} && sudo ./iokerneld ias 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME)
+iok_sessions += execute_remote([server_conn], cmd, False)
 
+print("starting client/agent IOKernel")
+cmd = "cd ~/{}/{} && sudo ./iokerneld simple 2>&1 | ts %s > iokernel.node-1.log".format(ARTIFACT_PATH, KERNEL_NAME)
+iok_sessions += execute_remote([client_conn], cmd, False)
+
+count = 2
+for agent_node in agent_conns:
+    cmd = "cd ~/{}/{} && sudo ./iokerneld simple 2>&1 | ts %s > iokernel.node-{:d}.log".format(ARTIFACT_PATH, KERNEL_NAME, count)
+    iok_sessions += execute_remote([agent_node], cmd, False)
+    count += 1
 sleep(1)
 
 for offered_load in OFFERED_LOADS:
+
+    # Start shm query breakwater mem? what does this mean
+    # now, pretty sure membw means memory bandwidth
+    # print("Starting shm query breakwater")
+    # cmd = "cd ~/{} && export SHMKEY=102 &&"\
+    #     " sudo ./caladan/apps/netbench/stress_shm_query membw:1000 > mem.log 2>&1".format(ARTIFACT_PATH)
+    # server_shmqueryBW_session = execute_remote([server_conn], cmd, False)
+    # sleep(1)
+
+    # # Start shm query from I guess swaptions?
+    # print("Starting shm query swaptions")
+    # cmd = "cd ~/{} && export SHMKEY=102 &&"\
+    #     " sudo ./caladan/apps/netbench/stress_shm_query 102:1000:17  > swaptionsGC_shm_query.out 2>&1".format(ARTIFACT_PATH)
+    # server_shmquerySWAPTIONS_session = execute_remote([server_conn], cmd, False)
+    # sleep(1)
+    if ENABLE_ANTAGONIST:
+        print("Starting server antagonist")
+        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d} "\
+                " {} > antagonist.out 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, threads, work_units, antagonist_param)
+        server_stress_session = execute_remote([server_conn], cmd, False)
+        sleep(1)
+
     print("Load = {:d}".format(offered_load))
     # Execute netbench application
     # - server
@@ -223,7 +279,20 @@ for offered_load in OFFERED_LOADS:
             .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG)
     server_session = execute_remote([server_conn], cmd, False)
     server_session = server_session[0]
-    
+    sleep(1)
+
+    # getting PIDs
+    # server netbench stress_shm_query swaptions iokerneld
+    print("grab PIDs at server")
+    cmd = "cd ~ && echo netbench > PID.txt && pidof netbench >> PID.txt"
+    execute_remote([server_conn], cmd, True)
+    if ENABLE_ANTAGONIST:
+        cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
+        execute_remote([server_conn], cmd, True)
+    cmd = "cd ~ && echo iokerneld >> PID.txt && pidof iokerneld >> PID.txt"
+    execute_remote([server_conn], cmd, True)
+    # cmd = "cd ~ && echo stress_shm_query >> PID.txt && pidof stress_shm_query >> PID.txt"
+    # execute_remote([server_conn], cmd, True)
     sleep(1)
 
     # - client
@@ -255,6 +324,19 @@ for offered_load in OFFERED_LOADS:
 
     # Wait for server to be killed
     server_session.recv_exit_status()
+
+    # kill shm query
+    # print("killing stress shm queries")
+    # cmd = "sudo killall -9 stress_shm_query"
+    # execute_remote([server_conn], cmd, True)
+    # server_shmqueryBW_session[0].recv_exit_status()
+    # server_shmquerySWAPTIONS_session[0].recv_exit_status()
+    if ENABLE_ANTAGONIST:
+        # kill antagonist
+        print("killing server antagonist")
+        cmd = "sudo killall -9 stress"
+        execute_remote([server_conn], cmd, True, False) # TODO
+        server_stress_session[0].recv_exit_status()
 
     sleep(1)
 
@@ -320,7 +402,7 @@ execute_local(cmd)
 
 if DOWNLOAD_RAW:
     print("Fetching raw output (all non rejected tasks)")
-    cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+    cmd = "rsync -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
                 " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
                 " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
     execute_local(cmd)

@@ -45,6 +45,8 @@ NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 
+DOWNLOAD_RAW = False
+
 ############################
 ### End of configuration ###
 ############################
@@ -185,6 +187,13 @@ for i in range(NUM_AGENT):
     generate_shenango_config(False, agent_conns[i], agent_ips[i], netmask,
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
+if DOWNLOAD_RAW:
+    # - client
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no netbench.cc"\
+            " {}@{}:~/{}/{}/breakwater/apps/netbench/"\
+            .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
+    execute_local(cmd)
+
 # Rebuild Shanango
 print("Building Shenango/Caladan...")
 cmd = "cd ~/{}/{} && make clean && make && make -C bindings/cc"\
@@ -204,12 +213,6 @@ cmd = "cd ~/{}/{}/breakwater/apps/netbench && make clean && make"\
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Execute IOKernel
-iok_sessions = []
-print("Executing IOKernel...")
-cmd = "cd ~/{}/{} && sudo ./iokerneld".format(ARTIFACT_PATH, KERNEL_NAME)
-iok_sessions += execute_remote([server_conn, client_conn] + agent_conns,
-                               cmd, False)
-
 iok_sessions = []
 print("starting server IOKernel")
 cmd = "cd ~/{}/{} && sudo ./iokerneld ias"\
@@ -371,7 +374,7 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:credit_expired_cps,client:req_dropped_rps"
 
 curr_date = datetime.now().strftime("%d_%m_%Y")
-curr_time = datetime.now().strftime("%H_%M-")
+curr_time = datetime.now().strftime("%H_%M-%S-")
 output_dir = "outputs/{}".format(curr_date)
 if not os.path.isdir(output_dir):
    os.makedirs(output_dir)
@@ -381,10 +384,13 @@ execute_local(cmd)
 
 cmd = "cat output.csv >> {}/{}.csv".format(output_dir, curr_time + output_prefix)
 execute_local(cmd)
-cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
-            " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
-# execute_local(cmd) # TODO
+
+if DOWNLOAD_RAW:
+    print("Fetching raw output (all non rejected tasks)")
+    cmd = "rsync  -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+                " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
+                " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
+    execute_local(cmd)
 
 # Remove temp outputs
 cmd = "rm output.csv"
