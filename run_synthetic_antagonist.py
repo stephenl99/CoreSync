@@ -46,7 +46,7 @@ NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 
-DOWNLOAD_RAW = True
+DOWNLOAD_RAW = False
 
 ENABLE_ANTAGONIST = True
 # number of threads for antagonist
@@ -372,6 +372,9 @@ if SPIN_SERVER:
 if DISABLE_WATCHDOG:
     output_prefix += "_nowd"
 
+if ENABLE_ANTAGONIST:
+    output_prefix += "_antagonist"
+
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
 # Print Headers
@@ -389,7 +392,7 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:credit_expired_cps,client:req_dropped_rps"
 
 curr_date = datetime.now().strftime("%d_%m_%Y")
-curr_time = datetime.now().strftime("%H_%M-%S-")
+curr_time = datetime.now().strftime("%H-%M-%S-")
 output_dir = "outputs/{}".format(curr_date)
 if not os.path.isdir(output_dir):
    os.makedirs(output_dir)

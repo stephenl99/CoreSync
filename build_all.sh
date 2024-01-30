@@ -28,10 +28,15 @@ export SHENANGODIR=$SCRIPTPATH/caladan
 
 # echo building MEMCACHED
 # pushd memcached
-# ./autogen.sh
+# # INHO
+# ./version.sh
+# autoreconf -i
+# # END INHO
+# # ./autogen.sh
 # ./configure --with-shenango=$SCRIPTPATH/caladan
 # make
 # popd
+
 # pushd memcached-linux
 # ./autogen.sh
 # ./configure

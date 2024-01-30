@@ -24,6 +24,7 @@ fi
 
 sed "s/CONFIG_SPDK=.*/CONFIG_SPDK=y/g" -i caladan/build/config
 
+# TODO These seem to be not working, and it's forcing sequential with the jobserver
 pushd caladan
 make submodules -j16
 make -j16
