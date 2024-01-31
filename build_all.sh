@@ -31,10 +31,10 @@ export SHENANGODIR=$SCRIPTPATH/caladan
 # pushd memcached
 # git checkout breakwater
 # # INHO
-# # ./version.sh
-# # autoreconf -i
+# ./version.sh
+# autoreconf -i
 # # END INHO
-# ./autogen.sh
+# # ./autogen.sh
 # ./configure --with-shenango=$SCRIPTPATH/caladan
 # make
 # popd

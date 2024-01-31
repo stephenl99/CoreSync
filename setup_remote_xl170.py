@@ -82,6 +82,7 @@ cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 &&"\
         " make -C bindings/cc".format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
+# remember to checkout breakwater branch of memcached
 # print("Setting up memcahced...")
 # cmd = "cd ~/{}/shenango-memcached && ./version.sh && autoreconf -i"\
 #         " && ./configure --with-shenango=../{}"\

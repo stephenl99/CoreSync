@@ -142,7 +142,7 @@ execute_remote([client_conn], cmd, True, False)
 # Distributing sources
 print("Distributing sources...")
 repo_name = (os.getcwd().split('/'))[-1]
-# - server
+# - server # TODO this seems weird, would this not clear the remote caladan folder? Seems like it won't unless delete specified
 for server in NODES:
     cmd = "rsync -azh -e \"ssh -i {} -o StrictHostKeyChecking=no"\
             " -o UserKnownHostsFile=/dev/null\" --progress --exclude outputs/ ../{}/{}/"\
