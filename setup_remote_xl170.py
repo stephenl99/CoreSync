@@ -55,6 +55,11 @@ for server in NODES:
             .format(KEY_LOCATION, repo_name, USERNAME, server, ARTIFACT_PATH)
     execute_local(cmd)
 
+# init git modules
+print("initializing git modules")
+cmd = "cd ~/{} && ./original_init_submodules.sh".format(ARTIFACT_PATH)
+execute_remote(conns, cmd, True)
+
 # install sub-modules
 print("Building submodules... (it may take a few mintues)")
 cmd = "cd ~/{}/{} && make submodules -j16".format(ARTIFACT_PATH, KERNEL_NAME)

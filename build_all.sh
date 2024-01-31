@@ -17,7 +17,7 @@ for dir in caladan caladan/shim caladan/bindings/cc caladan/apps/storage_service
 	make -C $dir
 done
 
-
+echo "$SCRIPTPATH"
 export SHENANGODIR=$SCRIPTPATH/caladan
 
 # echo building SILO
@@ -26,13 +26,15 @@ export SHENANGODIR=$SCRIPTPATH/caladan
 # make
 # popd
 
+# TODO
 # echo building MEMCACHED
 # pushd memcached
+# git checkout breakwater
 # # INHO
-# ./version.sh
-# autoreconf -i
+# # ./version.sh
+# # autoreconf -i
 # # END INHO
-# # ./autogen.sh
+# ./autogen.sh
 # ./configure --with-shenango=$SCRIPTPATH/caladan
 # make
 # popd
