@@ -16,7 +16,7 @@ import random
 OVERLOAD_ALG = "breakwater"
 
 # The number of client connections
-NUM_CONNS = 1000
+NUM_CONNS = 10
 
 # Average service time (in us)
 ST_AVG = 1
@@ -41,14 +41,17 @@ ENABLE_DIRECTPATH = True
 SPIN_SERVER = False
 DISABLE_WATCHDOG = False
 
-NUM_CORES_SERVER = 18
+NUM_CORES_SERVER = 4
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 
-DOWNLOAD_RAW = False
+DOWNLOAD_RAW = True
 
-ENABLE_ANTAGONIST = True
+ENABLE_ANTAGONIST = False
+
+IAS_DEBUG = True
+
 # number of threads for antagonist
 threads = 10
 # units of work each thread attempts at once
@@ -94,6 +97,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
                       + "\nruntime_kthreads {:d}".format(num_cores)
         if latency_critical:
             config_string += "\nruntime_priority lc"
+            # config_string += "\nruntime_ht_punish_us 10000" # paper says "infinite" for memcached. Defaulting to 0 so
         else:
             config_string += "\nruntime_priority be"
         config_string += "\nruntime_guaranteed_kthreads {:d}".format(guaranteed_kthread)
@@ -127,6 +131,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
 ### End of function definition ###
 
 NUM_AGENT = len(AGENTS)
+print ("number of agents: {:d}".format(NUM_AGENT))
 
 # configure Shenango IPs for config
 # TODO does each app on shenango need a unique server ip?
@@ -191,11 +196,20 @@ for agent in AGENTS:
             .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
+# adding to server
+if IAS_DEBUG:
+    print("Replacing ias.h")
+    # - server
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ias.h"\
+            " {}@{}:~/{}/{}/iokernel/"\
+            .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+    execute_local(cmd)
+
 # Generating config files
 print("Generating config files...")
 generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
-                         latency_critical=True, guaranteed_kthread=16)
+                         latency_critical=True, guaranteed_kthread=NUM_CORES_SERVER)
 generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
                          latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
@@ -374,6 +388,8 @@ if DISABLE_WATCHDOG:
 
 if ENABLE_ANTAGONIST:
     output_prefix += "_antagonist"
+output_prefix += "_{:d}cores".format(NUM_CORES_SERVER)
+output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
@@ -391,28 +407,63 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:resp_rx_pps,client:req_tx_pps"\
         ",client:credit_expired_cps,client:req_dropped_rps"
 
-curr_date = datetime.now().strftime("%d_%m_%Y")
-curr_time = datetime.now().strftime("%H-%M-%S-")
+curr_date = datetime.now().strftime("%m_%d_%Y")
+curr_time = datetime.now().strftime("%H-%M-%S")
 output_dir = "outputs/{}".format(curr_date)
 if not os.path.isdir(output_dir):
    os.makedirs(output_dir)
 
-cmd = "echo \"{}\" > {}/{}.csv".format(header, output_dir, curr_time + output_prefix)
+run_dir = output_dir + "/{}".format(curr_time)
+if not os.path.isdir(run_dir):
+   os.makedirs(run_dir)
+
+cmd = "echo \"{}\" > {}/{}.csv".format(header, run_dir, curr_time + "-" + output_prefix)
 execute_local(cmd)
 
-cmd = "cat output.csv >> {}/{}.csv".format(output_dir, curr_time + output_prefix)
+cmd = "cat output.csv >> {}/{}.csv".format(run_dir, curr_time + "-" + output_prefix)
 execute_local(cmd)
 
 if DOWNLOAD_RAW:
     print("Fetching raw output (all non rejected tasks)")
-    cmd = "rsync -tvz --progress -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-                " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/{}.csv"\
-                " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, output_dir, curr_time + "all_tasks_" + output_prefix)
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(KEY_LOCATION, 
+                                                                                        USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
 # Remove temp outputs
 cmd = "rm output.csv"
 execute_local(cmd, False)
 
-print("Output generated: outputs/{}.csv".format(output_prefix))
+if IAS_DEBUG:
+    print("iokernel log node 0")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+    print("stdout node 0")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+    print("PID.txt node 0")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], run_dir)
+    execute_local(cmd)
+
+    cmd = "mv {}/stdout.out {}/stdout_server.out".format(run_dir, run_dir)
+    execute_local(cmd)
+
+    print("iokernel log node 1")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+    print("stdout client node 1")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+
+
 print("Done.")
+# TODO make sure the output stuff is consistent across run scripts

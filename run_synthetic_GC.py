@@ -373,7 +373,7 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:resp_rx_pps,client:req_tx_pps"\
         ",client:credit_expired_cps,client:req_dropped_rps"
 
-curr_date = datetime.now().strftime("%d_%m_%Y")
+curr_date = datetime.now().strftime("%m_%d_%Y")
 curr_time = datetime.now().strftime("%H_%M-%S-")
 output_dir = "outputs/{}".format(curr_date)
 if not os.path.isdir(output_dir):
