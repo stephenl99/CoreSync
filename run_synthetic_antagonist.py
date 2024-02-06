@@ -74,6 +74,7 @@ antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 NET_RTT = 10
 slo = (ST_AVG + NET_RTT) * 10
 # slo = 200
+# slo = 999999
 
 # Verify configs #
 if OVERLOAD_ALG not in ["protego", "breakwater", "seda", "dagor", "nocontrol"]:
@@ -435,6 +436,7 @@ cmd = "rm output.csv"
 execute_local(cmd, False)
 
 if IAS_DEBUG:
+    # TODO put these all in one folder on server so I can just fetch with one command
     print("iokernel log node 0")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
@@ -461,6 +463,16 @@ if IAS_DEBUG:
     print("stdout client node 1")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+    print("stdout client node 1")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+    print("client dropped tasks")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
 
