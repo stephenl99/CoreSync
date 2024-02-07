@@ -38,7 +38,7 @@ OFFERED_LOADS = [800000]
 #     OFFERED_LOADS[i] *= 10000
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = False
+SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 4
@@ -48,12 +48,12 @@ CALADAN_THRESHOLD = 10
 
 DOWNLOAD_RAW = True
 
-ENABLE_ANTAGONIST = False
+ENABLE_ANTAGONIST = True
 
 IAS_DEBUG = True
 
 # number of threads for antagonist
-threads = 10
+threads = 2
 # units of work each thread attempts at once
 work_units = 10
 # config string describing what type of antagonist worker, and other variables
@@ -201,7 +201,7 @@ for agent in AGENTS:
 if IAS_DEBUG:
     print("Replacing ias.h")
     # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ias.h"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
             " {}@{}:~/{}/{}/iokernel/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
@@ -222,9 +222,16 @@ for i in range(NUM_AGENT):
 
 if DOWNLOAD_RAW:
     # - client
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no netbench.cc"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
             " {}@{}:~/{}/{}/breakwater/apps/netbench/"\
             .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
+    execute_local(cmd)
+
+if ENABLE_ANTAGONIST:
+    # - server
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
+            " {}@{}:~/{}/{}/breakwater/apps/netbench/"\
+            .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
 # Rebuild Shanango
@@ -429,6 +436,13 @@ if DOWNLOAD_RAW:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(KEY_LOCATION, 
                                                                                         USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
+if ENABLE_ANTAGONIST:
+    print("Fetching antagonist output")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.out {}/".format(KEY_LOCATION, 
+                                                                                        USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
 # Remove temp outputs
