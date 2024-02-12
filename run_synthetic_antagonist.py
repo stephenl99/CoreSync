@@ -13,7 +13,7 @@ import random
 ################################
 
 # Server overload algorithm (protego, breakwater, seda, dagor, nocontrol)
-OVERLOAD_ALG = "breakwater"
+OVERLOAD_ALG = "nocontrol"
 
 # The number of client connections
 NUM_CONNS = 10
@@ -32,7 +32,7 @@ ST_DIST = "exp"
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [800000]
+OFFERED_LOADS = [1600000]
 
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] *= 10000
@@ -41,19 +41,19 @@ ENABLE_DIRECTPATH = True
 SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
-NUM_CORES_SERVER = 4
+NUM_CORES_SERVER = 8
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 
 DOWNLOAD_RAW = True
 
-ENABLE_ANTAGONIST = True
+ENABLE_ANTAGONIST = False
 
 IAS_DEBUG = True
 
 # number of threads for antagonist
-threads = 2
+threads = 4
 # units of work each thread attempts at once
 work_units = 10
 # config string describing what type of antagonist worker, and other variables
@@ -74,7 +74,7 @@ antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 NET_RTT = 10
 slo = (ST_AVG + NET_RTT) * 10
 # slo = 200
-# slo = 999999
+slo = 999999
 
 # Verify configs #
 if OVERLOAD_ALG not in ["protego", "breakwater", "seda", "dagor", "nocontrol"]:
@@ -230,7 +230,7 @@ if DOWNLOAD_RAW:
 if ENABLE_ANTAGONIST:
     # - server
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/"\
+            " {}@{}:~/{}/{}/apps/netbench/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
@@ -287,8 +287,8 @@ for offered_load in OFFERED_LOADS:
     # sleep(1)
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
-        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d} "\
-                " {} > antagonist.out 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, threads, work_units, antagonist_param)
+        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
+                " {} > antagonist.csv 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, threads, work_units, antagonist_param)
         server_stress_session = execute_remote([server_conn], cmd, False)
         sleep(1)
 
@@ -323,7 +323,7 @@ for offered_load in OFFERED_LOADS:
     cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} client.config client {:d} {:f} {} {:d} {:d} {:d} {} {:d}"\
             " >stdout.out 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, NUM_CONNS,
-                    ST_AVG, ST_DIST, slo ,NUM_AGENT, offered_load, server_ip, 1)
+                    ST_AVG, ST_DIST, slo, NUM_AGENT, offered_load, server_ip, 1)
     client_agent_sessions += execute_remote([client_conn], cmd, False)
 
     sleep(1)
@@ -441,7 +441,7 @@ if DOWNLOAD_RAW:
 if ENABLE_ANTAGONIST:
     print("Fetching antagonist output")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.out {}/".format(KEY_LOCATION, 
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.csv {}/".format(KEY_LOCATION, 
                                                                                         USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
@@ -488,6 +488,38 @@ if IAS_DEBUG:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
+
+print("gathering config options for this experiment")
+config_dir = run_dir + "/config"
+if not os.path.isdir(config_dir):
+   os.makedirs(config_dir)
+
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/server.config {}/"\
+        " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, config_dir)
+execute_local(cmd)
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/client.config {}/"\
+        " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, config_dir)
+execute_local(cmd)
+if ENABLE_ANTAGONIST:
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/antagonist.config {}/"\
+        " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, config_dir)
+    execute_local(cmd)
+cmd = "cp configs/bw_config.h {}/".format(config_dir)
+execute_local(cmd)
+script_config = "overload algorithm: {}\n".format(OVERLOAD_ALG)
+script_config += "number of connections: {}\n".format(NUM_CONNS)
+script_config += "service time distribution: {}\n".format(ST_DIST)
+script_config += "average service time: {}\n".format(ST_AVG)
+script_config += "offered load: {}\n".format(OFFERED_LOADS[0])
+script_config += "server cores: {}\n".format(NUM_CORES_SERVER)
+script_config += "client cores: {}\n".format(NUM_CORES_CLIENT)
+script_config += "caladan threshold: {}\n".format(CALADAN_THRESHOLD)
+if ENABLE_ANTAGONIST:
+    script_config += "antagonist threads: {}, work_unit {}, command line arg: {}\n".format(threads, work_units, antagonist_param)
+script_config += "RTT: {}\n".format(NET_RTT)
+script_config += "SLO: {}\n".format(slo)
+cmd = "echo {} > {}/script.config".format(script_config, config_dir)
+execute_local(cmd)
 
 
 

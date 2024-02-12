@@ -10,6 +10,7 @@ extern "C" {
 
 #include <chrono>
 #include <iostream>
+#include <iomanip>
 
 barrier_t barrier;
 
@@ -46,6 +47,7 @@ void MainHandler(void *arg) {
   rt::Spawn([&]() {
     uint64_t last_total = 0;
     auto last = std::chrono::steady_clock::now();
+    double track_time = 0;
     while (1) {
       rt::Sleep(rt::kSeconds);
       auto now = std::chrono::steady_clock::now();
@@ -55,8 +57,10 @@ void MainHandler(void *arg) {
               .count();
       for (int i = 0; i < threads; i++) total += cnt[i];
       preempt_disable();
-      log_info("%f", static_cast<double>(total - last_total) / duration);
+      // log_info("%f", static_cast<double>(total - last_total) / duration);
+      std::cout << track_time << "," << static_cast<double>(total - last_total) / duration) << std::endl;
       preempt_enable();
+      track_time += duration;
       last_total = total;
       last = now;
     }
@@ -77,9 +81,12 @@ int main(int argc, char *argv[]) {
     return -EINVAL;
   }
 
+
   threads = std::stoi(argv[2], nullptr, 0);
   n = std::stoul(argv[3], nullptr, 0);
   worker_spec = std::string(argv[4]);
+
+  std::cout << std::setprecision(8) << std::fixed;
 
   ret = runtime_init(argv[1], MainHandler, NULL);
   if (ret) {
