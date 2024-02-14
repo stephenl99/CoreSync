@@ -13,7 +13,7 @@ import random
 ################################
 
 # Server overload algorithm (protego, breakwater, seda, dagor, nocontrol)
-OVERLOAD_ALG = "nocontrol"
+OVERLOAD_ALG = "breakwater"
 
 # The number of client connections
 NUM_CONNS = 10
@@ -32,7 +32,7 @@ ST_DIST = "exp"
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [1600000]
+OFFERED_LOADS = [800000]
 
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] *= 10000
@@ -41,7 +41,7 @@ ENABLE_DIRECTPATH = True
 SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
-NUM_CORES_SERVER = 8
+NUM_CORES_SERVER = 18
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
@@ -53,7 +53,7 @@ ENABLE_ANTAGONIST = False
 IAS_DEBUG = True
 
 # number of threads for antagonist
-threads = 4
+threads = 18
 # units of work each thread attempts at once
 work_units = 10
 # config string describing what type of antagonist worker, and other variables
@@ -74,7 +74,7 @@ antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 NET_RTT = 10
 slo = (ST_AVG + NET_RTT) * 10
 # slo = 200
-slo = 999999
+# slo = 999999
 
 # Verify configs #
 if OVERLOAD_ALG not in ["protego", "breakwater", "seda", "dagor", "nocontrol"]:
@@ -478,16 +478,16 @@ if IAS_DEBUG:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
+    if DOWNLOAD_RAW:
+        print("server drop tasks")
+        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        execute_local(cmd)
 
-    print("stdout client node 1")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
-
-    print("client dropped tasks")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
+        print("client dropped tasks")
+        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        execute_local(cmd)
 
 print("gathering config options for this experiment")
 config_dir = run_dir + "/config"
@@ -518,7 +518,7 @@ if ENABLE_ANTAGONIST:
     script_config += "antagonist threads: {}, work_unit {}, command line arg: {}\n".format(threads, work_units, antagonist_param)
 script_config += "RTT: {}\n".format(NET_RTT)
 script_config += "SLO: {}\n".format(slo)
-cmd = "echo {} > {}/script.config".format(script_config, config_dir)
+cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
 
 
