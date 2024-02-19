@@ -32,7 +32,7 @@ ST_DIST = "exp"
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [800000]
+OFFERED_LOADS = [1600000]
 
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] *= 10000
@@ -42,15 +42,16 @@ SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic 
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 18
+NUM_CORES_LC = 18
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 
-DOWNLOAD_RAW = True
+DOWNLOAD_RAW = False
 
 ENABLE_ANTAGONIST = False
 
-IAS_DEBUG = True
+IAS_DEBUG = False
 
 # number of threads for antagonist
 threads = 18
@@ -209,8 +210,8 @@ if IAS_DEBUG:
 # Generating config files
 print("Generating config files...")
 generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
-                         NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
-                         latency_critical=True, guaranteed_kthread=NUM_CORES_SERVER)
+                         NUM_CORES_LC, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
+                         latency_critical=True, guaranteed_kthread=NUM_CORES_LC)
 generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
                          latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
@@ -220,7 +221,7 @@ for i in range(NUM_AGENT):
     generate_shenango_config(False, agent_conns[i], agent_ips[i], netmask,
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
-if DOWNLOAD_RAW:
+if DOWNLOAD_RAW or True:
     # - client
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
             " {}@{}:~/{}/{}/breakwater/apps/netbench/"\
