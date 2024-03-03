@@ -16,7 +16,7 @@ import random
 OVERLOAD_ALG = "breakwater"
 
 # The number of client connections
-NUM_CONNS = 1000
+NUM_CONNS = 100
 
 # Average service time (in us)
 ST_AVG = 10
@@ -232,12 +232,22 @@ for i in range(NUM_AGENT):
     generate_shenango_config(False, agent_conns[i], agent_ips[i], netmask,
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
-
+# - server
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+        " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+        .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+execute_local(cmd)
 # - client
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-        " {}@{}:~/{}/{}/breakwater/apps/netbench/"\
+        " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
         .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
+# - agents
+for agent in AGENTS:
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+        " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+        .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
+    execute_local(cmd)
 
 if ENABLE_ANTAGONIST:
     # - server
@@ -423,6 +433,7 @@ output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 # Assuming 16 cores consistently for now, so not adding cores to prefix
 eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
 eric_prefix += "_{:d}conns".format(NUM_CONNS)
+eric_prefix += "_{:d}nodes".format(len(NODES))
 
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
