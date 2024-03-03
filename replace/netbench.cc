@@ -505,7 +505,7 @@ void RpcServer(struct srpc_ctx *ctx) {
   // else midx = 1;
 
   if (workn != 0) {
-    w->Work(workn)
+    w->Work(workn);
     // if (mutex_lock_if_uncongested(&shared_mutex[midx])) {
     //   workers[get_current_affinity()]->Work(workn);
     //   mutex_unlock(&shared_mutex[midx]);
@@ -1410,7 +1410,7 @@ void LoadShiftExperiment(int threads, double service_time) {
       std::exponential_distribution<double> rd(
           1.0 / (1000000.0 / (r.first / static_cast<double>(threads))));
       auto work = GenerateWork(std::bind(rd, rg), std::bind(wd, wg), last_us,
-                               last_us + r.second);
+                               last_us + r.second, false);
       last_us = work.back().start_us;
       w_temp.insert(w_temp.end(), work.begin(), work.end());
     }
@@ -1426,7 +1426,7 @@ void LoadShiftExperiment(int threads, double service_time) {
       std::exponential_distribution<double> rd(
           1.0 / (1000000.0 / (r.first / static_cast<double>(threads))));
       auto work = GenerateWork(std::bind(rd, rg), std::bind(wd, wg), last_us,
-                               last_us + r.second);
+                               last_us + r.second, true);
       last_us = work.back().start_us;
       w_temp.insert(w_temp.end(), work.begin(), work.end());
     }

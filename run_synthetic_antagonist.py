@@ -16,15 +16,15 @@ import random
 OVERLOAD_ALG = "breakwater"
 
 # The number of client connections
-NUM_CONNS = 10
+NUM_CONNS = 1000
 
 # Average service time (in us)
 ST_AVG = 10
 
 # make sure these match in bw_config.h
 # Too lazy to do a sed command or similar right now TODO
-BW_TARGET = 10
-BW_THRESHOLD = 20
+BW_TARGET = 80
+BW_THRESHOLD = 160
 
 # Service time distribution
 #    exp: exponential
@@ -37,7 +37,7 @@ ST_DIST = "exp"
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [1600000]
+OFFERED_LOADS = [850000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
@@ -45,12 +45,12 @@ LOADSHIFT = 0
 #     OFFERED_LOADS[i] *= 10000
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
+SPIN_SERVER = True # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 18
 NUM_CORES_LC = 16
-NUM_CORES_LC_GUARANTEED = 0
+NUM_CORES_LC_GUARANTEED = 16
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
@@ -62,6 +62,7 @@ ENABLE_ANTAGONIST = False
 IAS_DEBUG = True
 
 ERIC_CSV_NAMING = True
+CSV_NAME_DIR = True
 
 # number of threads for antagonist
 threads = 4
@@ -83,8 +84,8 @@ antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 
 # SLO = 10 * (average RPC processing time + network RTT)
 NET_RTT = 10
-slo = (ST_AVG + NET_RTT) * 10
-# slo = 200
+# slo = (ST_AVG + NET_RTT) * 10
+slo = 200
 # slo = 999999
 
 # Verify configs #
@@ -332,9 +333,9 @@ for offered_load in OFFERED_LOADS:
     print("\tExecuting client...")
     client_agent_sessions = []
     cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
-            " {} client.config client {:d} {:f} {} {:d} {:d} {:d} {} {:d}"\
+            " {} client.config client {:d} {:f} {} {:d} {:d} {:d} {:d} {} {:d}"\
             " >stdout.out 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, NUM_CONNS,
-                    ST_AVG, ST_DIST, slo, NUM_AGENT, offered_load, server_ip, 1)
+                    ST_AVG, ST_DIST, slo, NUM_AGENT, offered_load, LOADSHIFT, server_ip, 1)
     client_agent_sessions += execute_remote([client_conn], cmd, False)
 
     sleep(1)
@@ -342,8 +343,8 @@ for offered_load in OFFERED_LOADS:
     # - agent
     print("\tExecuting agents...")
     cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
-            " {} client.config agent {} >stdout.out 2>&1"\
-            .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, client_ip)
+            " {} client.config agent {} {:d} >stdout.out 2>&1"\
+            .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, client_ip, LOADSHIFT)
     client_agent_sessions += execute_remote(agent_conns, cmd, False)
 
     # Wait for client and agents
@@ -421,6 +422,7 @@ output_prefix += "_{:d}cores".format(NUM_CORES_SERVER)
 output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 # Assuming 16 cores consistently for now, so not adding cores to prefix
 eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
+eric_prefix += "_{:d}conns".format(NUM_CONNS)
 
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
@@ -444,7 +446,7 @@ output_dir = "outputs/{}".format(curr_date)
 if not os.path.isdir(output_dir):
    os.makedirs(output_dir)
 
-run_dir = output_dir + "/{}".format(curr_time)
+run_dir = output_dir + "/" + curr_time
 if not os.path.isdir(run_dir):
    os.makedirs(run_dir)
 
@@ -562,6 +564,13 @@ if IAS_DEBUG:
     cmd = "cd {} && python3 ../../../graph_scripts/create_corecsv.py".format(run_dir)
     execute_local(cmd)
 
+if CSV_NAME_DIR:
+    os.chdir(output_dir)
+    if os.path.isdir(eric_prefix):
+        print("error, desired directory name is already an output directory")
+        exit()
+    os.rename(curr_time, eric_prefix)
+    os.chdir("..")
 
 print("Done.")
 # TODO make sure the output stuff is consistent across run scripts
