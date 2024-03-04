@@ -26,6 +26,13 @@ ST_AVG = int(sys.argv[3])
 # Too lazy to do a sed command or similar right now TODO
 BW_TARGET = int(sys.argv[4])
 BW_THRESHOLD = int(sys.argv[4]) * 2
+print("modifying bw_config.h values for target and threshold")
+cmd = "sed -i \'s/#define SBW_DELAY_TARGET.*/#define SBW_DELAY_TARGET\\t\\t\\t{:d}/g\'"\
+        " configs/bw_config.h".format(BW_TARGET)
+execute_local(cmd)
+cmd = "sed -i \'s/#define SBW_DROP_THRESH.*/#define SBW_DROP_THRESH\\t\\t\\t{:d}/g\'"\
+        " configs/bw_config.h".format(BW_THRESHOLD)
+execute_local(cmd)
 
 # Service time distribution
 #    exp: exponential
