@@ -23,8 +23,8 @@ ST_AVG = 10
 
 # make sure these match in bw_config.h
 # Too lazy to do a sed command or similar right now TODO
-BW_TARGET = 80
-BW_THRESHOLD = 160
+BW_TARGET = 10
+BW_THRESHOLD = 20
 
 # Service time distribution
 #    exp: exponential
@@ -37,7 +37,8 @@ ST_DIST = "exp"
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [850000]
+# OFFERED_LOADS = [1600000]
+OFFERED_LOADS = [400000, 800000, 1000000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 2000000, 3000000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
@@ -45,15 +46,17 @@ LOADSHIFT = 0
 #     OFFERED_LOADS[i] *= 10000
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = True # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
+SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 18
 NUM_CORES_LC = 16
-NUM_CORES_LC_GUARANTEED = 16
+NUM_CORES_LC_GUARANTEED = 0
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
+
+AVOID_LARGE_DOWNLOADS = True
 
 DOWNLOAD_RAW = True
 
@@ -471,7 +474,7 @@ if ERIC_CSV_NAMING:
     cmd = "mv {}/{}.csv {}/{}.csv".format(run_dir, curr_time + "-" + output_prefix, run_dir, eric_prefix)
     execute_local(cmd)
 
-if DOWNLOAD_RAW:
+if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
     print("Fetching raw output (all non rejected tasks)")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(KEY_LOCATION, 
@@ -491,10 +494,11 @@ execute_local(cmd, False)
 
 if IAS_DEBUG:
     # TODO put these all in one folder on server so I can just fetch with one command
-    print("iokernel log node 0")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
+    if not AVOID_LARGE_DOWNLOADS:
+        print("iokernel log node 0")
+        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+        execute_local(cmd)
 
     print("stdout node 0")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
@@ -518,7 +522,7 @@ if IAS_DEBUG:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
-    if DOWNLOAD_RAW:
+    if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
         print("server drop tasks")
         cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
             " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
@@ -570,7 +574,7 @@ cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
 
 # produce the cores if applicable
-if IAS_DEBUG:
+if IAS_DEBUG and not AVOID_LARGE_DOWNLOADS:
     print("creating cores csv")
     cmd = "cd {} && python3 ../../../graph_scripts/create_corecsv.py".format(run_dir)
     execute_local(cmd)

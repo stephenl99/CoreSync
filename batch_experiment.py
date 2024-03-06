@@ -28,6 +28,9 @@ caladan_threshold = 10
 slo = 200
 count = 1
 
+# 1 is true, 0 is false
+avoid_large_downloads = 1
+
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
@@ -38,7 +41,9 @@ def call_experiment():
     os.system("python3 param_synthetic_antagonist.py {} {:d} {:d} {:d} {} {:d} {:d} {:d} {:d} {:d} {:d} {:d} {:d}".format(
               algorithm, connections, service_time, breakwater_target, service_distribution, offered_load,
               loadshift, spin_server, num_cores_server, num_cores_lc, num_cores_lc_guaranteed, caladan_threshold,
-              slo))
+              slo, avoid_large_downloads))
+    print("sleeping for 5 seconds before next connection")
+    sleep(5)
     # just for testing
     # exit()
 

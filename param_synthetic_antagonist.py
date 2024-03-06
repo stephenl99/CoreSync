@@ -63,6 +63,8 @@ NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = int(sys.argv[12])
 
+AVOID_LARGE_DOWNLOADS = int(sys.argv[13])
+
 DOWNLOAD_RAW = True
 
 ENABLE_ANTAGONIST = False
@@ -479,7 +481,7 @@ if ERIC_CSV_NAMING:
     cmd = "mv {}/{}.csv {}/{}.csv".format(run_dir, curr_time + "-" + output_prefix, run_dir, eric_prefix)
     execute_local(cmd)
 
-if DOWNLOAD_RAW:
+if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
     print("Fetching raw output (all non rejected tasks)")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(KEY_LOCATION, 
@@ -499,10 +501,11 @@ execute_local(cmd, False)
 
 if IAS_DEBUG:
     # TODO put these all in one folder on server so I can just fetch with one command
-    print("iokernel log node 0")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
+    if not AVOID_LARGE_DOWNLOADS:
+        print("iokernel log node 0")
+        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+        execute_local(cmd)
 
     print("stdout node 0")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
@@ -526,7 +529,7 @@ if IAS_DEBUG:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
-    if DOWNLOAD_RAW:
+    if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
         print("server drop tasks")
         cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
             " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
@@ -578,7 +581,7 @@ cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
 
 # produce the cores if applicable
-if IAS_DEBUG:
+if IAS_DEBUG and not AVOID_LARGE_DOWNLOADS:
     print("creating cores csv")
     cmd = "cd {} && python3 ../../../graph_scripts/create_corecsv.py".format(run_dir)
     execute_local(cmd)
