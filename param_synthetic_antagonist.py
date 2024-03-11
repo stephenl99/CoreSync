@@ -46,6 +46,8 @@ ST_DIST = sys.argv[5]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
 OFFERED_LOADS = [int(sys.argv[6])]
+# OFFERED_LOADS = [400000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 2000000, 3000000]
+
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = int(sys.argv[7])
 
@@ -69,7 +71,7 @@ DOWNLOAD_RAW = True
 
 ENABLE_ANTAGONIST = False
 
-IAS_DEBUG = True
+IAS_DEBUG = False
 
 ERIC_CSV_NAMING = True
 CSV_NAME_DIR = True
@@ -507,38 +509,38 @@ if IAS_DEBUG:
             " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
         execute_local(cmd)
 
-    print("stdout node 0")
+print("stdout node 0")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+execute_local(cmd)
+
+print("PID.txt node 0")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], run_dir)
+execute_local(cmd)
+
+cmd = "mv {}/stdout.out {}/stdout_server.out".format(run_dir, run_dir)
+execute_local(cmd)
+
+print("iokernel log node 1")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+execute_local(cmd)
+
+print("stdout client node 1")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+execute_local(cmd)
+if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
+    print("server drop tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
-    print("PID.txt node 0")
+    print("client dropped tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
-
-    cmd = "mv {}/stdout.out {}/stdout_server.out".format(run_dir, run_dir)
-    execute_local(cmd)
-
-    print("iokernel log node 1")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
-
-    print("stdout client node 1")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
-    if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
-        print("server drop tasks")
-        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-        execute_local(cmd)
-
-        print("client dropped tasks")
-        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-        execute_local(cmd)
 
 print("gathering config options for this experiment")
 config_dir = run_dir + "/config"

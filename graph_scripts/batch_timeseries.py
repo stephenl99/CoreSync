@@ -257,6 +257,13 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
 
 
     plt4.plot(netbench_cores[:,0], netbench_cores[:,1], label='netbench', color='blue')
+    
+    mask1 = (netbench_cores[:,0] >= 4)
+    mask2 = (netbench_cores[:,0] <= 8)
+    m = np.logical_and(mask1, mask2)
+    netbench_avg = netbench_cores[m, :]
+
+    plt4.axhline(y=np.average(netbench_avg[:,1]), color='r')
 
     # plt4.axis(xmin=6, xmax=14.5)
     # plt4.axis(ymax=6)
@@ -306,7 +313,12 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
 
 
       plt6.plot(antagonist_cores[:,0], antagonist_cores[:,1], label='antagonist', color='red')
+      mask1 = (antagonist_cores[:,0] >= 4)
+      mask2 = (antagonist_cores[:,0] <= 8)
+      m = np.logical_and(mask1, mask2)
+      antagonist_avg = antagonist_cores[m, :]
 
+      plt6.axhline(y=np.average(antagonist_avg[:,1]), color='blue')
       # plt6.axis(xmin=6, xmax=14.5)
       plt6.axis(xmin=exp_start - .1, xmax=exp_end + .1)
       if close_up:
