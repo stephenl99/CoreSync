@@ -23,8 +23,8 @@ ST_AVG = 10
 
 # make sure these match in bw_config.h
 # Too lazy to do a sed command or similar right now TODO
-BW_TARGET = 10
-BW_THRESHOLD = 20
+BW_TARGET = 80
+BW_THRESHOLD = 160
 
 # Service time distribution
 #    exp: exponential
@@ -38,9 +38,11 @@ ST_DIST = "exp"
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
 # OFFERED_LOADS = [1600000]
-OFFERED_LOADS = [400000, 800000, 1000000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 2000000, 3000000]
+OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
+
+SCHEDULER = "simple"
 
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] *= 10000
@@ -62,7 +64,7 @@ DOWNLOAD_RAW = True
 
 ENABLE_ANTAGONIST = False
 
-IAS_DEBUG = True
+IAS_DEBUG = False
 
 ERIC_CSV_NAMING = True
 CSV_NAME_DIR = True
@@ -280,7 +282,7 @@ execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 # Execute IOKernel
 iok_sessions = []
 print("starting server IOKernel")
-cmd = "cd ~/{}/{} && sudo ./iokerneld ias 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME)
+cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER)
 iok_sessions += execute_remote([server_conn], cmd, False)
 
 print("starting client/agent IOKernel")
@@ -437,6 +439,7 @@ output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
 eric_prefix += "_{:d}conns".format(NUM_CONNS)
 eric_prefix += "_{:d}nodes".format(len(NODES))
+eric_prefix += "_{}".format(SCHEDULER)
 
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
@@ -569,6 +572,7 @@ script_config += "RTT: {}\n".format(NET_RTT)
 script_config += "SLO: {}\n".format(slo)
 script_config += "Connections: {:d}\n".format(NUM_CONNS)
 script_config += "loadshift: {}\n".format(LOADSHIFT)
+script_config += "scheduler: {}".format(SCHEDULER)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
