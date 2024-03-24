@@ -11,7 +11,7 @@ echo "BASE_DIR = '${SCRIPTPATH}/'" > base_dir.py
 git submodule update --init -f --recursive caladan
 
 # apply breakwater patches
-. init_submodules.sh
+# . init_submodules.sh
 
 if lspci | grep -q 'ConnectX-5'; then
  sed "s/CONFIG_MLX5=.*/CONFIG_MLX5=y/g" -i caladan/build/config
