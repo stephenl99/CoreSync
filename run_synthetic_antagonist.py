@@ -37,8 +37,8 @@ ST_DIST = "exp"
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-# OFFERED_LOADS = [1600000]
-OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
+OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
+# OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
@@ -57,8 +57,33 @@ NUM_CORES_LC_GUARANTEED = 0
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
+# TODO currently will only work with range policies I think?
+CALADAN_INTERVAL = 5
+
+DELAY_RANGE = False
+delay_lower = 0.5
+delay_upper = 1
+UTILIZATION_RANGE = False
+utilization_lower = 0.75
+utilization_upper = 0.95
+
+"""
+First, we design a queueing-based policy called delay
+range which attempts to maintain a specified average queue-
+ing delay across all cores within an application. Every core-
+allocation interval (every 5 μs), the simulation checks the
+average queueing delay. If it is below the specified lower
+bound, a core is revoked; if it is above the upper bound, a core
+is added. Similarly, with our utilization range policy, a core
+is added or removed whenever the average CPU utilization
+over the past interval (fraction of time spent handling tasks)
+falls outside the specified range.
+"""
+
+
 
 AVOID_LARGE_DOWNLOADS = True
+
 
 DOWNLOAD_RAW = True
 
@@ -120,6 +145,12 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
             config_string += "\nruntime_priority be"
         config_string += "\nruntime_guaranteed_kthreads {:d}".format(guaranteed_kthread)
         config_string += "\nruntime_qdelay_us {:d}".format(CALADAN_THRESHOLD)
+        if DELAY_RANGE:
+            config_string += "\nruntime_qdelay_lower_thresh_ns {:d}".format(int(delay_lower*1000))
+            config_string += "\nruntime_qdelay_upper_thresh_ns {:d}".format(int(delay_upper*1000))
+        if UTILIZATION_RANGE:
+            config_string += "\nruntime_util_lower_thresh {:f}".format(utilization_lower)
+            config_string += "\nruntime_util_upper_thresh {:f}".format(utilization_upper)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
@@ -282,7 +313,10 @@ execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 # Execute IOKernel
 iok_sessions = []
 print("starting server IOKernel")
-cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER)
+if DELAY_RANGE or UTILIZATION_RANGE:
+    cmd = "cd ~/{}/{} && sudo ./iokerneld simple range_policy interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, CALADAN_INTERVAL)
+else:
+    cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER)
 iok_sessions += execute_remote([server_conn], cmd, False)
 
 print("starting client/agent IOKernel")
@@ -439,7 +473,12 @@ output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
 eric_prefix += "_{:d}conns".format(NUM_CONNS)
 eric_prefix += "_{:d}nodes".format(len(NODES))
-eric_prefix += "_{}".format(SCHEDULER)
+if UTILIZATION_RANGE:
+    eric_prefix += "_utilization_range_{}_{}".format(utilization_lower, utilization_upper)
+elif DELAY_RANGE:
+    eric_prefix += "_delay_range_{}_{}".format(delay_lower, delay_upper)
+else:
+    eric_prefix += "_{}".format(SCHEDULER)
 
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 

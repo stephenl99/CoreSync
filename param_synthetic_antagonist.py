@@ -45,7 +45,11 @@ ST_DIST = sys.argv[5]
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [int(sys.argv[6])]
+RANGE_LOADS = int(sys.argv[14])
+if RANGE_LOADS:
+    OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1800000, 2000000]
+else:
+    OFFERED_LOADS = [int(sys.argv[6])]
 # OFFERED_LOADS = [400000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 2000000, 3000000]
 
 # loadshift = 1 for load shifts in netbench.cc
@@ -75,6 +79,16 @@ IAS_DEBUG = False
 
 ERIC_CSV_NAMING = True
 CSV_NAME_DIR = True
+
+SCHEDULER = sys.argv[15]
+CALADAN_INTERVAL = 5
+
+DELAY_RANGE = int(sys.argv[16])
+delay_lower = float(sys.argv[17])
+delay_upper = float(sys.argv[18])
+UTILIZATION_RANGE = int(sys.argv[19])
+utilization_lower = float(sys.argv[20])
+utilization_upper = float(sys.argv[21])
 
 # number of threads for antagonist
 threads = 4
@@ -127,6 +141,12 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
             config_string += "\nruntime_priority be"
         config_string += "\nruntime_guaranteed_kthreads {:d}".format(guaranteed_kthread)
         config_string += "\nruntime_qdelay_us {:d}".format(CALADAN_THRESHOLD)
+        if DELAY_RANGE:
+            config_string += "\nruntime_qdelay_lower_thresh_ns {:d}".format(int(delay_lower*1000))
+            config_string += "\nruntime_qdelay_upper_thresh_ns {:d}".format(int(delay_upper*1000))
+        if UTILIZATION_RANGE:
+            config_string += "\nruntime_util_lower_thresh {:f}".format(utilization_lower)
+            config_string += "\nruntime_util_upper_thresh {:f}".format(utilization_upper)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
@@ -289,7 +309,10 @@ execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 # Execute IOKernel
 iok_sessions = []
 print("starting server IOKernel")
-cmd = "cd ~/{}/{} && sudo ./iokerneld ias 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME)
+if DELAY_RANGE or UTILIZATION_RANGE:
+    cmd = "cd ~/{}/{} && sudo ./iokerneld simple range_policy interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, CALADAN_INTERVAL)
+else:
+    cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER)
 iok_sessions += execute_remote([server_conn], cmd, False)
 
 print("starting client/agent IOKernel")
@@ -446,6 +469,12 @@ output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
 eric_prefix += "_{:d}conns".format(NUM_CONNS)
 eric_prefix += "_{:d}nodes".format(len(NODES))
+if UTILIZATION_RANGE:
+    eric_prefix += "_utilization_range_{}_{}".format(utilization_lower, utilization_upper)
+elif DELAY_RANGE:
+    eric_prefix += "_delay_range_{}_{}".format(delay_lower, delay_upper)
+else:
+    eric_prefix += "_{}".format(SCHEDULER)
 
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
@@ -578,6 +607,7 @@ script_config += "RTT: {}\n".format(NET_RTT)
 script_config += "SLO: {}\n".format(slo)
 script_config += "Connections: {:d}\n".format(NUM_CONNS)
 script_config += "loadshift: {}\n".format(LOADSHIFT)
+script_config += "scheduler: {}".format(SCHEDULER)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
