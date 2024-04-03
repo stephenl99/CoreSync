@@ -13,17 +13,23 @@ second_in_us = 1000000
 
 def main():
     antagonist = int(sys.argv[1])
-    exp_start = int(sys.argv[2])
-    exp_end = int(sys.argv[3])
+    core_output  = int(sys.argv[2])
+    exp_start = int(sys.argv[3])
+    exp_end = int(sys.argv[4])
     pdf = matplotlib.backends.backend_pdf.PdfPages("time_series_plots.pdf")
     for current_dir in os.listdir():
         if current_dir == "overall_csvs" or os.path.isfile(current_dir):
            continue
         print("plotting dir: {}".format(current_dir))
-        graph_one(pdf, current_dir, antagonist, exp_start, exp_end)
+        graph_one(pdf, current_dir, core_output, antagonist, exp_start, exp_end)
     pdf.close()
 
-def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
+def graph_one(pdf, dir, antagonist, core_output, exp_start, exp_end, granularity=500):
+    rasterize = False
+    close_up = False
+    close_up_min = 2.45
+    close_up_max = 2.55
+
     df = pd.read_csv("{}/all_tasks.csv".format(dir))
     Data = df[['start_us', 'duration_us']]
     completed_tasks_data = np.array(Data)
@@ -38,18 +44,19 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     latency_99 = latency_99[idx:]
     # resort back by timestamp
     latency_99 = latency_99[latency_99[:,0].argsort()]
-
-    df = pd.read_csv("{}/netbench_cores.csv".format(dir))
-    Data = df[['time(s)', 'cores']]
-    # df = df[['time(s)', 'cores']]
-    # Data = df[df['time(s)'] > start_time]
-    netbench_cores = np.array(Data)
-    if antagonist:
-      df = pd.read_csv("{}/antagonist_cores.csv".format(dir))
+    
+    if core_output:
+      df = pd.read_csv("{}/netbench_cores.csv".format(dir))
       Data = df[['time(s)', 'cores']]
       # df = df[['time(s)', 'cores']]
       # Data = df[df['time(s)'] > start_time]
-      antagonist_cores = np.array(Data)
+      netbench_cores = np.array(Data)
+      if antagonist:
+        df = pd.read_csv("{}/antagonist_cores.csv".format(dir))
+        Data = df[['time(s)', 'cores']]
+        # df = df[['time(s)', 'cores']]
+        # Data = df[df['time(s)'] > start_time]
+        antagonist_cores = np.array(Data)
 
 
     df = pd.read_csv("{}/all_tasks.csv".format(dir))
@@ -57,30 +64,31 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     first_tsc_all_tasks = Data['tsc'].iloc[0]
     start_time_all_tasks = Data['start_us'].iloc[0] / second_in_us
 
-    with open("{}/iokernel.node-0.log".format(dir)) as f:
-            tsc = 0
-            for line in f:
-                if "time:" in line:
-                  line_items = line.split()
-                  ticks = int(line_items[6])
-                if "tsc" in line:
-
+    if core_output:
+      with open("{}/iokernel.node-0.log".format(dir)) as f:
+              tsc = 0
+              for line in f:
+                  if "time:" in line:
                     line_items = line.split()
-                    time = float(line_items[2][:-1])
+                    ticks = int(line_items[6])
+                  if "tsc" in line:
 
-                    tsc =  int(line_items[7])
+                      line_items = line.split()
+                      time = float(line_items[2][:-1])
 
-                    if tsc > first_tsc_all_tasks:
-                      break
+                      tsc =  int(line_items[7])
 
-    sync_adjustment_us = (tsc / ticks) - (first_tsc_all_tasks / ticks)
-    sync_adjustment = sync_adjustment_us / second_in_us
+                      if tsc > first_tsc_all_tasks:
+                        break
 
-    cores_time_diff = time - sync_adjustment - start_time_all_tasks
+      sync_adjustment_us = (tsc / ticks) - (first_tsc_all_tasks / ticks)
+      sync_adjustment = sync_adjustment_us / second_in_us
 
-    netbench_cores[:,0] -= cores_time_diff
-    if antagonist:
-      antagonist_cores[:,0] -= cores_time_diff
+      cores_time_diff = time - sync_adjustment - start_time_all_tasks
+
+      netbench_cores[:,0] -= cores_time_diff
+      if antagonist:
+        antagonist_cores[:,0] -= cores_time_diff
      
      
     df = pd.read_csv("{}/client_drop_tasks.csv".format(dir))
@@ -96,14 +104,17 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     # server_drop_data[:,0] /= second_in_us
 
     increment = granularity # us
-    curr_time = increment
-    prev_time = 0
+    curr_time = int(exp_start * 1e6) + increment
+    prev_time = int(exp_start * 1e6)
     total_time = int(exp_end * 1e6)
 
     server_drop_count = []
     client_drop_count = []
     throughput_over_time = []
     latency_over_time = []
+    latency_99_over_time = []
+    latency_99_us = latency_99.copy()
+    latency_99_us[:,0] = latency_99[:,0] * second_in_us
 
     while curr_time <= total_time:
       server_mask1 = (server_drop_data[:,0] < curr_time)
@@ -125,6 +136,12 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
 
       # latency
       latency_over_time.append((curr_time, np.average(completed_tasks_data_us[m, 1])))
+      # print(completed_tasks_data_us[m, 1].shape)
+      try:
+        latency_99_over_time.append((curr_time, np.percentile(completed_tasks_data_us[m,1], 99)))
+      except:
+         pass
+      # exit()
 
       prev_time = curr_time
       curr_time += increment
@@ -134,6 +151,7 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     client_drop_count = np.array(client_drop_count)
     throughput_over_time = np.array(throughput_over_time)
     latency_over_time = np.array(latency_over_time)
+    latency_99_over_time = np.array(latency_99_over_time)
 
     temp_server_drop_count = server_drop_count.copy()
     temp_client_drop_count = client_drop_count.copy()
@@ -153,24 +171,22 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     # fix the doubling of the time column, and converting from us to s
     total_drop_count[:,0] /= 2
     
-    rasterize = False
     # start_time = cores_start_time
     # end_time = start_time + (exp_end - exp_start)
     # end_time = 20
-    close_up = False
-    close_up_min = 2.42
-    close_up_max = 2.47
+    
     """
     PLOTTING
     """
-    if antagonist:
+    if antagonist and core_output:
       fig, (plt1, plt2, plt3, plt4, plt5, plt6) = plt.subplots(6, 1, figsize=(20,20))
-    else:
+    elif core_output:
       fig, (plt1, plt2, plt3, plt4, plt5) = plt.subplots(5, 1, figsize=(20,20))
+    else:
+       fig, (plt1, plt2, plt3, plt4) = plt.subplots(4, 1, figsize=(20,20))
 
     fig.suptitle(dir, fontsize=22, y=1.0)
 
-    x_range = [3.9, 8.5]
     """
     PLOT 1
     """
@@ -209,7 +225,10 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
 
 
     # plt2.scatter(latency_99[:,0], latency_99[:,1], rasterized=rasterize, alpha=0.2)
-    plt2.plot(latency_99[:,0], latency_99[:,1], rasterized=rasterize)
+    # if close_up:
+    #   plt2.plot(latency_99[:,0], latency_99[:,1], rasterized=rasterize)
+    # else:
+    plt2.plot(latency_99_over_time[:,0] / second_in_us, latency_99_over_time[:,1], rasterized=rasterize)
 
     # plt2.axis(ymin=0, ymax=500)
     if close_up:
@@ -242,7 +261,6 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     plt3.set_ylabel('drops per second', fontsize=18)
     plt3.legend(fontsize=18)
 
-
     """
     PLOT 4
     """
@@ -256,47 +274,48 @@ def graph_one(pdf, dir, antagonist, exp_start, exp_end, granularity=5000):
     # plt.ylim(ymin=0)
 
 
-    plt4.plot(netbench_cores[:,0], netbench_cores[:,1], label='netbench', color='blue')
-    
-    mask1 = (netbench_cores[:,0] >= 4)
-    mask2 = (netbench_cores[:,0] <= 8)
-    m = np.logical_and(mask1, mask2)
-    netbench_avg = netbench_cores[m, :]
+    plt4.plot(temp_throughput_over_time[:,0], temp_throughput_over_time[:,1])
 
-    plt4.axhline(y=np.average(netbench_avg[:,1]), color='r')
-
-    # plt4.axis(xmin=6, xmax=14.5)
-    # plt4.axis(ymax=6)
+    # plt5.axis(xmin=6, xmax=14.5)
+    # plt5.axis(ymax=6)
     plt4.axis(xmin=exp_start - .1, xmax=exp_end + .1)
     if close_up:
       plt4.axis(xmin=close_up_min, xmax=close_up_max)
     plt4.set_xlabel('Time(s)', fontsize=18)
-    plt4.set_ylabel('number of cores', fontsize=18)
-    plt4.legend(fontsize=18)
+    plt4.set_ylabel('throughput per second', fontsize=18)
+    # plt4.legend(fontsize=18)
 
     """
     PLOT 5
     """
-    plt5.tick_params(axis='both', which='major', labelsize=18)
+    if core_output:
+      plt5.tick_params(axis='both', which='major', labelsize=18)
 
-    # plt5.axis(xmin=x_range[0], xmax=x_range[1])
-    #plt5.axis(ymin=0, ymax=25)
-    plt5.grid(which='major', color='black', linewidth=1.0)
-    plt5.grid(which='minor', color='grey', linewidth=0.2)
-    plt5.minorticks_on()
-    # plt.ylim(ymin=0)
+      # plt5.axis(xmin=x_range[0], xmax=x_range[1])
+      #plt5.axis(ymin=0, ymax=25)
+      plt5.grid(which='major', color='black', linewidth=1.0)
+      plt5.grid(which='minor', color='grey', linewidth=0.2)
+      plt5.minorticks_on()
+      # plt.ylim(ymin=0)
 
 
-    plt5.plot(temp_throughput_over_time[:,0], temp_throughput_over_time[:,1])
+      plt5.plot(netbench_cores[:,0], netbench_cores[:,1], label='netbench', color='blue')
+      
+      mask1 = (netbench_cores[:,0] >= 4)
+      mask2 = (netbench_cores[:,0] <= 8)
+      m = np.logical_and(mask1, mask2)
+      netbench_avg = netbench_cores[m, :]
 
-    # plt5.axis(xmin=6, xmax=14.5)
-    # plt5.axis(ymax=6)
-    plt5.axis(xmin=exp_start - .1, xmax=exp_end + .1)
-    if close_up:
-      plt5.axis(xmin=close_up_min, xmax=close_up_max)
-    plt5.set_xlabel('Time(s)', fontsize=18)
-    plt5.set_ylabel('throughput per second', fontsize=18)
-    plt5.legend(fontsize=18)
+      plt5.axhline(y=np.average(netbench_avg[:,1]), color='r')
+
+      # plt4.axis(xmin=6, xmax=14.5)
+      # plt4.axis(ymax=6)
+      plt5.axis(xmin=exp_start - .1, xmax=exp_end + .1)
+      if close_up:
+        plt5.axis(xmin=close_up_min, xmax=close_up_max)
+      plt5.set_xlabel('Time(s)', fontsize=18)
+      plt5.set_ylabel('number of cores', fontsize=18)
+      plt5.legend(fontsize=18)
 
     """
     PLOT 6
