@@ -26,6 +26,18 @@ ST_AVG = 10
 BW_TARGET = 80
 BW_THRESHOLD = 160
 
+print("modifying bw_config.h values for target and threshold")
+cmd = "sed -i \'s/#define SBW_DELAY_TARGET.*/#define SBW_DELAY_TARGET\\t\\t\\t{:d}/g\'"\
+        " configs/bw_config.h".format(BW_TARGET)
+execute_local(cmd)
+cmd = "sed -i \'s/#define SBW_DROP_THRESH.*/#define SBW_DROP_THRESH\\t\\t\\t{:d}/g\'"\
+        " configs/bw_config.h".format(BW_THRESHOLD)
+execute_local(cmd)
+
+cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\\t{:d}/g\'"\
+        " configs/bw2_config.h".format(BW_THRESHOLD)
+execute_local(cmd)
+
 # Service time distribution
 #    exp: exponential
 #    const: constant
@@ -36,16 +48,20 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
 
-# OFFERED_LOADS = [400000, 800000, 1200000]
-OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
+# OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000]
+# OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000]
+# OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
 # OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
+# OFFERED_LOADS = [3000000, 3500000, 4000000, 4500000, 5000000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
-SCHEDULER = "simple"
+SCHEDULER = "ias"
 
-# for i in range(len(OFFERED_LOADS)):
-#     OFFERED_LOADS[i] *= 10000
+OFFERED_LOADS = [1000000, 1000000, 1000000, 1000000, 1000000]
+current_load_factor = 1.0
+for i in range(len(OFFERED_LOADS)):
+    OFFERED_LOADS[i] = int(OFFERED_LOADS[i] * current_load_factor)
 
 ENABLE_DIRECTPATH = True
 SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
@@ -470,7 +486,12 @@ if ENABLE_ANTAGONIST:
 output_prefix += "_{:d}cores".format(NUM_CORES_SERVER)
 output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 # Assuming 16 cores consistently for now, so not adding cores to prefix
-eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
+if LOADSHIFT:
+    eric_prefix += "_loadshift"
+else:
+    eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
+
+eric_prefix += "_{:d}cores".format(NUM_CORES_LC)
 eric_prefix += "_{:d}conns".format(NUM_CONNS)
 eric_prefix += "_{:d}nodes".format(len(NODES))
 if UTILIZATION_RANGE:
@@ -590,7 +611,7 @@ if ENABLE_ANTAGONIST:
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/antagonist.config {}/"\
         " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, config_dir)
     execute_local(cmd)
-cmd = "cp configs/bw_config.h {}/".format(config_dir)
+cmd = "cp configs/bw_config.h {}/ && cp configs/bw2_config.h {}/".format(config_dir, config_dir)
 execute_local(cmd)
 script_config = "overload algorithm: {}\n".format(OVERLOAD_ALG)
 script_config += "number of nodes: {}\n".format(len(NODES))
@@ -612,6 +633,7 @@ script_config += "SLO: {}\n".format(slo)
 script_config += "Connections: {:d}\n".format(NUM_CONNS)
 script_config += "loadshift: {}\n".format(LOADSHIFT)
 script_config += "scheduler: {}".format(SCHEDULER)
+script_config += "allocation interval: {}".format(CALADAN_INTERVAL)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)

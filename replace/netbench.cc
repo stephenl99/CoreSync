@@ -85,8 +85,14 @@ constexpr uint64_t kNumDupClient = 32;
 std::vector<double> offered_loads;
 double offered_load;
 
-std::vector<std::pair<double, uint64_t>> rates = {{400000, 4500000}, {1400000, 500000}, {850000, 1500000}, 
-                                                  {1400000, 500000}, {400000, 1000000}};
+// for shorter exp duration, 4 seconds total
+std::vector<std::pair<double, uint64_t>> rates = {{400000, 2500000}, {1400000, 500000}, {850000, 500000}, 
+                                                  {1400000, 500000}};
+
+// std::vector<std::pair<double, uint64_t>> rates = {{875000, 4000000}};
+
+// std::vector<std::pair<double, uint64_t>> rates = {{400000, 4500000}, {1400000, 500000}, {850000, 1500000}, 
+//                                                   {1400000, 500000}, {400000, 1000000}};
 
 /// ERIC
 // 0: steady state
@@ -1056,6 +1062,9 @@ std::vector<work_unit> RunExperiment(
                            << client_drop_tasks[i].server_queue << "," << client_drop_tasks[i].server_time << std::endl;
   }
   client_drop_tasks_file.close();
+  std::cout << "offered: " << offered << std::endl;
+  std::cout << "resps: " << resps << std::endl;
+  std::cout << "elapsed: " << elapsed_ << std::endl;
   // END ERIC
 
   // Report results.
@@ -1407,8 +1416,9 @@ void LoadShiftExperiment(int threads, double service_time) {
     std::vector<work_unit> w_temp;
     uint64_t last_us = 0;
     for (auto &r : rates) {
+      double rate = r.first / (double) total_agents;
       std::exponential_distribution<double> rd(
-          1.0 / (1000000.0 / (r.first / static_cast<double>(threads))));
+          1.0 / (1000000.0 / (rate / static_cast<double>(threads))));
       auto work = GenerateWork(std::bind(rd, rg), std::bind(wd, wg), last_us,
                                last_us + r.second, false);
       last_us = work.back().start_us;
@@ -1423,8 +1433,9 @@ void LoadShiftExperiment(int threads, double service_time) {
     std::vector<work_unit> w_temp;
     uint64_t last_us = 0;
     for (auto &r : rates) {
+      double rate = r.first / (double) total_agents;
       std::exponential_distribution<double> rd(
-          1.0 / (1000000.0 / (r.first / static_cast<double>(threads))));
+          1.0 / (1000000.0 / (rate / static_cast<double>(threads))));
       auto work = GenerateWork(std::bind(rd, rg), std::bind(wd, wg), last_us,
                                last_us + r.second, true);
       last_us = work.back().start_us;

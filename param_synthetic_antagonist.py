@@ -4,7 +4,7 @@ import paramiko
 import os
 from time import sleep
 from util import *
-from config_remote import *
+import config_remote
 from datetime import datetime
 import random
 import sys
@@ -34,6 +34,10 @@ cmd = "sed -i \'s/#define SBW_DROP_THRESH.*/#define SBW_DROP_THRESH\\t\\t\\t{:d}
         " configs/bw_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
+cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\\t{:d}/g\'"\
+        " configs/bw2_config.h".format(BW_THRESHOLD)
+execute_local(cmd)
+
 # Service time distribution
 #    exp: exponential
 #    const: constant
@@ -45,11 +49,18 @@ ST_DIST = sys.argv[5]
 #                 110, 120, 130, 140, 150, 160]
 
 # OFFERED_LOADS = [400000, 800000, 1200000]
-RANGE_LOADS = int(sys.argv[14])
+RANGE_LOADS = int(sys.argv[15])
 if RANGE_LOADS:
-    OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1800000, 2000000]
+    OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000]
+    # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000,
+    #              3500000, 4000000, 4500000]
 else:
     OFFERED_LOADS = [int(sys.argv[6])]
+
+# OFFERED_LOADS = [1000000, 1000000, 1000000, 1000000, 1000000]
+# current_load_factor = float(sys.argv[23])
+# for i in range(len(OFFERED_LOADS)):
+#     OFFERED_LOADS[i] = int(OFFERED_LOADS[i] * current_load_factor)
 # OFFERED_LOADS = [400000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 2000000, 3000000]
 
 # loadshift = 1 for load shifts in netbench.cc
@@ -69,7 +80,7 @@ NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = int(sys.argv[12])
 
-AVOID_LARGE_DOWNLOADS = int(sys.argv[13])
+AVOID_LARGE_DOWNLOADS = int(sys.argv[14])
 
 DOWNLOAD_RAW = True
 
@@ -80,15 +91,15 @@ IAS_DEBUG = False
 ERIC_CSV_NAMING = True
 CSV_NAME_DIR = True
 
-SCHEDULER = sys.argv[15]
+SCHEDULER = sys.argv[16]
 CALADAN_INTERVAL = 5
 
-DELAY_RANGE = int(sys.argv[16])
-delay_lower = float(sys.argv[17])
-delay_upper = float(sys.argv[18])
-UTILIZATION_RANGE = int(sys.argv[19])
-utilization_lower = float(sys.argv[20])
-utilization_upper = float(sys.argv[21])
+DELAY_RANGE = int(sys.argv[17])
+delay_lower = float(sys.argv[18])
+delay_upper = float(sys.argv[19])
+UTILIZATION_RANGE = int(sys.argv[20])
+utilization_lower = float(sys.argv[21])
+utilization_upper = float(sys.argv[22])
 
 # number of threads for antagonist
 threads = 4
@@ -170,12 +181,12 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         config_string += "\ndisable_watchdog 1"
 
     cmd = "cd ~/{} && echo \"{}\" > {} "\
-            .format(ARTIFACT_PATH,config_string, config_name)
+            .format(config_remote.ARTIFACT_PATH,config_string, config_name)
 
     return execute_remote([conn], cmd, True)
 ### End of function definition ###
 
-NUM_AGENT = len(AGENTS)
+NUM_AGENT = len(config_remote.AGENTS)
 print ("number of agents: {:d}".format(NUM_AGENT))
 
 # configure Shenango IPs for config
@@ -191,23 +202,23 @@ for i in range(NUM_AGENT):
     agent_ip = "192.168.1." + str(101 + i)
     agent_ips.append(agent_ip)
 
-k = paramiko.RSAKey.from_private_key_file(KEY_LOCATION)
+k = paramiko.RSAKey.from_private_key_file(config_remote.KEY_LOCATION)
 # connection to server
 server_conn = paramiko.SSHClient()
 server_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-server_conn.connect(hostname = SERVERS[0], username = USERNAME, pkey = k)
+server_conn.connect(hostname = config_remote.SERVERS[0], username = config_remote.USERNAME, pkey = k)
 
 # connection to client
 client_conn = paramiko.SSHClient()
 client_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client_conn.connect(hostname = CLIENT, username = USERNAME, pkey = k)
+client_conn.connect(hostname = config_remote.CLIENT, username = config_remote.USERNAME, pkey = k)
 
 # connections to agents
 agent_conns = []
-for agent in AGENTS:
+for agent in config_remote.AGENTS:
     agent_conn = paramiko.SSHClient()
     agent_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    agent_conn.connect(hostname = agent, username = USERNAME, pkey = k)
+    agent_conn.connect(hostname = agent, username = config_remote.USERNAME, pkey = k)
     agent_conns.append(agent_conn)
 
 # Clean-up environment
@@ -219,7 +230,7 @@ execute_remote([server_conn, client_conn] + agent_conns,
 sleep(1)
 
 # Remove temporary output
-cmd = "cd ~/{} && rm output.csv output.json".format(ARTIFACT_PATH)
+cmd = "cd ~/{} && rm output.csv output.json".format(config_remote.ARTIFACT_PATH)
 execute_remote([client_conn], cmd, True, False)
 
 # Distribuing config files
@@ -227,18 +238,18 @@ print("Distributing configs...")
 # - server
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
         " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_local(cmd)
 # - client
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
         " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_local(cmd)
 # - agents
-for agent in AGENTS:
+for agent in config_remote.AGENTS:
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
             " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
-            .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
+            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
 
 # adding to server
@@ -247,7 +258,7 @@ if IAS_DEBUG:
     # - server
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
             " {}@{}:~/{}/{}/iokernel/"\
-            .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
 
 # Generating config files
@@ -267,61 +278,61 @@ for i in range(NUM_AGENT):
 # - server
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_local(cmd)
 # - client
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_local(cmd)
 # - agents
-for agent in AGENTS:
+for agent in config_remote.AGENTS:
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-        .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
 
 if ENABLE_ANTAGONIST:
     # - server
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
             " {}@{}:~/{}/{}/apps/netbench/"\
-            .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
 
 # Rebuild Shanango
 print("Building Shenango/Caladan...")
 cmd = "cd ~/{}/{} && make clean && make && make -C bindings/cc"\
-        .format(ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Build Breakwater
 print("Building Breakwater...")
 cmd = "cd ~/{}/{}/breakwater && make clean && make && make -C bindings/cc"\
-        .format(ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Build Netbench
 print("Building netbench...")
 cmd = "cd ~/{}/{}/breakwater/apps/netbench && make clean && make"\
-        .format(ARTIFACT_PATH, KERNEL_NAME)
+        .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
 # Execute IOKernel
 iok_sessions = []
 print("starting server IOKernel")
 if DELAY_RANGE or UTILIZATION_RANGE:
-    cmd = "cd ~/{}/{} && sudo ./iokerneld simple range_policy interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, CALADAN_INTERVAL)
+    cmd = "cd ~/{}/{} && sudo ./iokerneld simple range_policy interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, CALADAN_INTERVAL)
 else:
-    cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER)
+    cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, SCHEDULER)
 iok_sessions += execute_remote([server_conn], cmd, False)
 
 print("starting client/agent IOKernel")
-cmd = "cd ~/{}/{} && sudo ./iokerneld simple 2>&1 | ts %s > iokernel.node-1.log".format(ARTIFACT_PATH, KERNEL_NAME)
+cmd = "cd ~/{}/{} && sudo ./iokerneld simple 2>&1 | ts %s > iokernel.node-1.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
 iok_sessions += execute_remote([client_conn], cmd, False)
 
 count = 2
 for agent_node in agent_conns:
-    cmd = "cd ~/{}/{} && sudo ./iokerneld simple 2>&1 | ts %s > iokernel.node-{:d}.log".format(ARTIFACT_PATH, KERNEL_NAME, count)
+    cmd = "cd ~/{}/{} && sudo ./iokerneld simple 2>&1 | ts %s > iokernel.node-{:d}.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, count)
     iok_sessions += execute_remote([agent_node], cmd, False)
     count += 1
 sleep(1)
@@ -332,20 +343,20 @@ for offered_load in OFFERED_LOADS:
     # now, pretty sure membw means memory bandwidth
     # print("Starting shm query breakwater")
     # cmd = "cd ~/{} && export SHMKEY=102 &&"\
-    #     " sudo ./caladan/apps/netbench/stress_shm_query membw:1000 > mem.log 2>&1".format(ARTIFACT_PATH)
+    #     " sudo ./caladan/apps/netbench/stress_shm_query membw:1000 > mem.log 2>&1".format(config_remote.ARTIFACT_PATH)
     # server_shmqueryBW_session = execute_remote([server_conn], cmd, False)
     # sleep(1)
 
     # # Start shm query from I guess swaptions?
     # print("Starting shm query swaptions")
     # cmd = "cd ~/{} && export SHMKEY=102 &&"\
-    #     " sudo ./caladan/apps/netbench/stress_shm_query 102:1000:17  > swaptionsGC_shm_query.out 2>&1".format(ARTIFACT_PATH)
+    #     " sudo ./caladan/apps/netbench/stress_shm_query 102:1000:17  > swaptionsGC_shm_query.out 2>&1".format(config_remote.ARTIFACT_PATH)
     # server_shmquerySWAPTIONS_session = execute_remote([server_conn], cmd, False)
     # sleep(1)
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
         cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
-                " {} > antagonist.csv 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, threads, work_units, antagonist_param)
+                " {} > antagonist.csv 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
         server_stress_session = execute_remote([server_conn], cmd, False)
         sleep(1)
 
@@ -355,7 +366,7 @@ for offered_load in OFFERED_LOADS:
     print("\tExecuting server...")
     cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} server.config server >stdout.out 2>&1"\
-            .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG)
+            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG)
     server_session = execute_remote([server_conn], cmd, False)
     server_session = server_session[0]
     sleep(1)
@@ -379,7 +390,7 @@ for offered_load in OFFERED_LOADS:
     client_agent_sessions = []
     cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} client.config client {:d} {:f} {} {:d} {:d} {:d} {:d} {} {:d}"\
-            " >stdout.out 2>&1".format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, NUM_CONNS,
+            " >stdout.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG, NUM_CONNS,
                     ST_AVG, ST_DIST, slo, NUM_AGENT, offered_load, LOADSHIFT, server_ip, 1)
     client_agent_sessions += execute_remote([client_conn], cmd, False)
 
@@ -389,7 +400,7 @@ for offered_load in OFFERED_LOADS:
     print("\tExecuting agents...")
     cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
             " {} client.config agent {} {:d} >stdout.out 2>&1"\
-            .format(ARTIFACT_PATH, KERNEL_NAME, OVERLOAD_ALG, client_ip, LOADSHIFT)
+            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG, client_ip, LOADSHIFT)
     client_agent_sessions += execute_remote(agent_conns, cmd, False)
 
     # Wait for client and agents
@@ -440,7 +451,7 @@ if not os.path.exists("outputs"):
 # Move output.csv and output.json
 print("Collecting outputs...")
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/output.csv ./"\
-        " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH)
+        " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH)
 execute_local(cmd)
 
 output_prefix = "{}".format(OVERLOAD_ALG)
@@ -466,9 +477,13 @@ if ENABLE_ANTAGONIST:
 output_prefix += "_{:d}cores".format(NUM_CORES_SERVER)
 output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
 # Assuming 16 cores consistently for now, so not adding cores to prefix
-eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
+if LOADSHIFT:
+    eric_prefix += "_loadshift"
+else:
+    eric_prefix += "_{:d}k".format(int(OFFERED_LOADS[0] / 1000))
+eric_prefix += "_{:d}cores".format(NUM_CORES_LC)
 eric_prefix += "_{:d}conns".format(NUM_CONNS)
-eric_prefix += "_{:d}nodes".format(len(NODES))
+eric_prefix += "_{:d}nodes".format(len(config_remote.NODES))
 if UTILIZATION_RANGE:
     eric_prefix += "_utilization_range_{}_{}".format(utilization_lower, utilization_upper)
 elif DELAY_RANGE:
@@ -515,15 +530,15 @@ if ERIC_CSV_NAMING:
 if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
     print("Fetching raw output (all non rejected tasks)")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(KEY_LOCATION, 
-                                                                                        USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(config_remote.KEY_LOCATION, 
+                                                                                        config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
 if ENABLE_ANTAGONIST:
     print("Fetching antagonist output")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.csv {}/".format(KEY_LOCATION, 
-                                                                                        USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.csv {}/".format(config_remote.KEY_LOCATION, 
+                                                                                        config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
 # Remove temp outputs
@@ -535,17 +550,17 @@ if IAS_DEBUG:
     if not AVOID_LARGE_DOWNLOADS:
         print("iokernel log node 0")
         cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
         execute_local(cmd)
 
 print("stdout node 0")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
 execute_local(cmd)
 
 print("PID.txt node 0")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-        " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], run_dir)
 execute_local(cmd)
 
 cmd = "mv {}/stdout.out {}/stdout_server.out".format(run_dir, run_dir)
@@ -553,22 +568,22 @@ execute_local(cmd)
 
 print("iokernel log node 1")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
 execute_local(cmd)
 
 print("stdout client node 1")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
 execute_local(cmd)
 if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
     print("server drop tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
     print("client dropped tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
 print("gathering config options for this experiment")
@@ -577,19 +592,19 @@ if not os.path.isdir(config_dir):
    os.makedirs(config_dir)
 
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/server.config {}/"\
-        " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, config_dir)
+        " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_dir)
 execute_local(cmd)
 cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/client.config {}/"\
-        " >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, config_dir)
+        " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_dir)
 execute_local(cmd)
 if ENABLE_ANTAGONIST:
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/antagonist.config {}/"\
-        " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, config_dir)
+        " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_dir)
     execute_local(cmd)
-cmd = "cp configs/bw_config.h {}/".format(config_dir)
+cmd = "cp configs/bw_config.h {}/ && cp configs/bw2_config.h {}/".format(config_dir, config_dir)
 execute_local(cmd)
 script_config = "overload algorithm: {}\n".format(OVERLOAD_ALG)
-script_config += "number of nodes: {}\n".format(len(NODES))
+script_config += "number of nodes: {}\n".format(len(config_remote.NODES))
 script_config += "number of connections: {}\n".format(NUM_CONNS)
 script_config += "service time distribution: {}\n".format(ST_DIST)
 script_config += "average service time: {}\n".format(ST_AVG)
@@ -607,7 +622,8 @@ script_config += "RTT: {}\n".format(NET_RTT)
 script_config += "SLO: {}\n".format(slo)
 script_config += "Connections: {:d}\n".format(NUM_CONNS)
 script_config += "loadshift: {}\n".format(LOADSHIFT)
-script_config += "scheduler: {}".format(SCHEDULER)
+script_config += "scheduler: {}\n".format(SCHEDULER)
+script_config += "allocation interval: {}".format(CALADAN_INTERVAL)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
@@ -627,4 +643,5 @@ if CSV_NAME_DIR:
     os.chdir("..")
 
 print("Done.")
+config_remote.PARAM_EXP_FLAG = True
 # TODO make sure the output stuff is consistent across run scripts
