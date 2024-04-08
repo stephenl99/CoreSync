@@ -47,12 +47,12 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
 
-OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 2000000]
+# OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 2000000]
 # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000]
 # OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
 # OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # OFFERED_LOADS = [3000000, 3500000, 4000000, 4500000, 5000000]
-# OFFERED_LOADS = [600000, 600000, 700000, 700000]
+OFFERED_LOADS = [600000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
@@ -71,7 +71,8 @@ NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 # TODO currently will only work with range policies I think?
-CALADAN_INTERVAL = 5
+CALADAN_INTERVAL = 10
+BREAKWATER_CORE_PARKING = True
 
 DELAY_RANGE = False
 delay_lower = 0.5
@@ -142,7 +143,7 @@ if ST_DIST not in ["exp", "const", "bimod"]:
 
 ### Function definitions ###
 def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
-        directpath, spin, disable_watchdog, latency_critical=False, guaranteed_kthread=0, antagonist="none"):
+        directpath, spin, disable_watchdog, latency_critical=False, guaranteed_kthread=0, antagonist="none", breakwater_park_cores=False):
     config_name = ""
     config_string = ""
     if is_server:
@@ -164,6 +165,8 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if UTILIZATION_RANGE:
             config_string += "\nruntime_util_lower_thresh {:f}".format(utilization_lower)
             config_string += "\nruntime_util_upper_thresh {:f}".format(utilization_upper)
+        if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
+            config_string += "\nbreakwater_prevent_parks 1" # I don't think we want this behavior to be on anything but netbench w/breakwater
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
@@ -271,7 +274,7 @@ if IAS_DEBUG:
 print("Generating config files...")
 generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
                          NUM_CORES_LC, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
-                         latency_critical=True, guaranteed_kthread=NUM_CORES_LC_GUARANTEED)
+                         latency_critical=True, guaranteed_kthread=NUM_CORES_LC_GUARANTEED, breakwater_park_cores=BREAKWATER_CORE_PARKING)
 generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, False, DISABLE_WATCHDOG,
                          latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
