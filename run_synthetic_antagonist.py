@@ -73,6 +73,7 @@ CALADAN_THRESHOLD = 10
 # TODO currently will only work with range policies I think?
 CALADAN_INTERVAL = 10
 BREAKWATER_CORE_PARKING = True
+SWB_CORE_PARK_TARGET = 1.0
 
 DELAY_RANGE = False
 delay_lower = 0.5
@@ -166,7 +167,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
             config_string += "\nruntime_util_lower_thresh {:f}".format(utilization_lower)
             config_string += "\nruntime_util_upper_thresh {:f}".format(utilization_upper)
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
-            config_string += "\nbreakwater_prevent_parks 1" # I don't think we want this behavior to be on anything but netbench w/breakwater
+            config_string += "\nbreakwater_prevent_parks {:f}".format(SWB_CORE_PARK_TARGET) # I don't think we want this behavior to be on anything but netbench w/breakwater
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
