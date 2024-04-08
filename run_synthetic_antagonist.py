@@ -22,7 +22,6 @@ NUM_CONNS = 100
 ST_AVG = 10
 
 # make sure these match in bw_config.h
-# Too lazy to do a sed command or similar right now TODO
 BW_TARGET = 80
 BW_THRESHOLD = 160
 
@@ -48,20 +47,18 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
 
-# OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000]
+OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 2000000]
 # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000]
 # OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
 # OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # OFFERED_LOADS = [3000000, 3500000, 4000000, 4500000, 5000000]
+# OFFERED_LOADS = [600000, 600000, 700000, 700000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
-SCHEDULER = "ias"
+# schedulers = ["simple", "ias", "range_policy"]
+SCHEDULER = "simple"
 
-OFFERED_LOADS = [1000000, 1000000, 1000000, 1000000, 1000000]
-current_load_factor = 1.0
-for i in range(len(OFFERED_LOADS)):
-    OFFERED_LOADS[i] = int(OFFERED_LOADS[i] * current_load_factor)
 
 ENABLE_DIRECTPATH = True
 SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
@@ -332,7 +329,7 @@ print("starting server IOKernel")
 if DELAY_RANGE or UTILIZATION_RANGE:
     cmd = "cd ~/{}/{} && sudo ./iokerneld simple range_policy interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, CALADAN_INTERVAL)
 else:
-    cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER)
+    cmd = "cd ~/{}/{} && sudo ./iokerneld {} interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(ARTIFACT_PATH, KERNEL_NAME, SCHEDULER, CALADAN_INTERVAL)
 iok_sessions += execute_remote([server_conn], cmd, False)
 
 print("starting client/agent IOKernel")
@@ -348,20 +345,6 @@ sleep(1)
 
 for offered_load in OFFERED_LOADS:
 
-    # Start shm query breakwater mem? what does this mean
-    # now, pretty sure membw means memory bandwidth
-    # print("Starting shm query breakwater")
-    # cmd = "cd ~/{} && export SHMKEY=102 &&"\
-    #     " sudo ./caladan/apps/netbench/stress_shm_query membw:1000 > mem.log 2>&1".format(ARTIFACT_PATH)
-    # server_shmqueryBW_session = execute_remote([server_conn], cmd, False)
-    # sleep(1)
-
-    # # Start shm query from I guess swaptions?
-    # print("Starting shm query swaptions")
-    # cmd = "cd ~/{} && export SHMKEY=102 &&"\
-    #     " sudo ./caladan/apps/netbench/stress_shm_query 102:1000:17  > swaptionsGC_shm_query.out 2>&1".format(ARTIFACT_PATH)
-    # server_shmquerySWAPTIONS_session = execute_remote([server_conn], cmd, False)
-    # sleep(1)
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
         cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
@@ -555,46 +538,46 @@ if ENABLE_ANTAGONIST:
 cmd = "rm output.csv"
 execute_local(cmd, False)
 
-if IAS_DEBUG:
-    # TODO put these all in one folder on server so I can just fetch with one command
-    if not AVOID_LARGE_DOWNLOADS:
-        print("iokernel log node 0")
-        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
-        execute_local(cmd)
 
-    print("stdout node 0")
+# TODO put these all in one folder on server so I can just fetch with one command
+if not IAS_DEBUG or not AVOID_LARGE_DOWNLOADS:
+    print("iokernel log node 0")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
-    print("PID.txt node 0")
+print("stdout node 0")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+execute_local(cmd)
+
+print("PID.txt node 0")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], run_dir)
+execute_local(cmd)
+
+cmd = "mv {}/stdout.out {}/stdout_server.out".format(run_dir, run_dir)
+execute_local(cmd)
+
+print("iokernel log node 1")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+execute_local(cmd)
+
+print("stdout client node 1")
+cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+execute_local(cmd)
+if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
+    print("server drop tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/PID.txt {}/ >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
-    cmd = "mv {}/stdout.out {}/stdout_server.out".format(run_dir, run_dir)
-    execute_local(cmd)
-
-    print("iokernel log node 1")
+    print("client dropped tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-1.log {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
-
-    print("stdout client node 1")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
-    if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
-        print("server drop tasks")
-        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-        execute_local(cmd)
-
-        print("client dropped tasks")
-        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
-        execute_local(cmd)
 
 print("gathering config options for this experiment")
 config_dir = run_dir + "/config"
