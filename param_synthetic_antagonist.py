@@ -83,12 +83,20 @@ NUM_CORES_CLIENT = 16
 CALADAN_THRESHOLD = int(sys.argv[12])
 CALADAN_INTERVAL = int(sys.argv[24])
 
-BREAKWATER_CORE_PARKING = True
+BREAKWATER_CORE_PARKING = int(sys.argv[25])
 SBW_CORE_PARK_TARGET = current_load_factor
 
 AVOID_LARGE_DOWNLOADS = int(sys.argv[14])
 
-DOWNLOAD_RAW = True
+DOWNLOAD_RAW = False
+if DOWNLOAD_RAW:
+    cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
+        " replace/netbench.cc"
+    execute_local(cmd)
+else:
+    cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t false/g\'"\
+        " replace/netbench.cc"
+    execute_local(cmd)
 
 ENABLE_ANTAGONIST = False
 
@@ -271,7 +279,11 @@ if IAS_DEBUG:
 
 if BREAKWATER_TIMESERIES:
     cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
-        " src/bw_server.c".format(ARTIFACT_PATH, KERNEL_NAME)
+        " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_remote([server_conn], cmd)
+else:
+    cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
+        " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_remote([server_conn], cmd)
 
 # Generating config files
@@ -601,6 +613,17 @@ if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
+
+if BREAKWATER_TIMESERIES:
+    print("grabbing bw_server timeseries")
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/timeseries.csv {}/"\
+        " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+    with open("{}/timeseries.csv".format(run_dir)) as original:
+        data = original.read()
+    execute_local("rm {}/timeseries.csv".format(run_dir))
+    with open("{}/timeseries.csv".format(run_dir), "w+") as modified:
+        modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st\n" + data)
 
 print("gathering config options for this experiment")
 config_dir = run_dir + "/config"

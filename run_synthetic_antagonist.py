@@ -37,7 +37,7 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
         " configs/bw2_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
-BREAKWATER_TIMESERIES = True
+BREAKWATER_TIMESERIES = False
 
 
 # Service time distribution
@@ -55,7 +55,7 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
 # OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # OFFERED_LOADS = [3000000, 3500000, 4000000, 4500000, 5000000]
-OFFERED_LOADS = [600000]
+OFFERED_LOADS = [1600000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
@@ -64,18 +64,18 @@ SCHEDULER = "simple"
 
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
+SPIN_SERVER = True # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 18
 NUM_CORES_LC = 16
-NUM_CORES_LC_GUARANTEED = 0
+NUM_CORES_LC_GUARANTEED = 16
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 # TODO currently will only work with range policies I think?
 CALADAN_INTERVAL = 10
-BREAKWATER_CORE_PARKING = True
+BREAKWATER_CORE_PARKING = False
 SBW_CORE_PARK_TARGET = 1.0
 
 DELAY_RANGE = False
@@ -98,12 +98,18 @@ over the past interval (fraction of time spent handling tasks)
 falls outside the specified range.
 """
 
-
-
 AVOID_LARGE_DOWNLOADS = True
 
 
-DOWNLOAD_RAW = True
+DOWNLOAD_RAW = False
+if DOWNLOAD_RAW:
+    cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
+        " replace/netbench.cc"
+    execute_local(cmd)
+else:
+    cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t false/g\'"\
+        " replace/netbench.cc"
+    execute_local(cmd)
 
 ENABLE_ANTAGONIST = False
 
@@ -315,6 +321,10 @@ if ENABLE_ANTAGONIST:
 
 if BREAKWATER_TIMESERIES:
     cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
+        " src/bw_server.c".format(ARTIFACT_PATH, KERNEL_NAME)
+    execute_remote([server_conn], cmd)
+else:
+    cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
         " src/bw_server.c".format(ARTIFACT_PATH, KERNEL_NAME)
     execute_remote([server_conn], cmd)
 
@@ -594,6 +604,16 @@ if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
     execute_local(cmd)
+if BREAKWATER_TIMESERIES:
+    print("grabbing bw_server timeseries")
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/timeseries.csv {}/"\
+        " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+    with open("{}/timeseries.csv".format(run_dir)) as original:
+        data = original.read()
+    execute_local("rm {}/timeseries.csv".format(run_dir))
+    with open("{}/timeseries.csv".format(run_dir), "w+") as modified:
+        modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st\n" + data)
 
 print("gathering config options for this experiment")
 config_dir = run_dir + "/config"

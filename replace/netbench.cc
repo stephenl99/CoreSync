@@ -46,6 +46,8 @@ constexpr uint16_t kBarrierPort = 41;
 const struct crpc_ops *crpc_ops;
 const struct srpc_ops *srpc_ops;
 
+#define ENABLE_DOWNLOAD_ALL_TASKS			 false
+
 namespace {
 
 using namespace std::chrono;
@@ -1052,6 +1054,7 @@ std::vector<work_unit> RunExperiment(
 
   // ERIC
   // sort my vector (if possible), and outfile it
+  #if ENABLE_DOWNLOAD_ALL_TASKS
   std::ofstream client_drop_tasks_file;
   client_drop_tasks_file.open ("client_drop_tasks.csv");
   client_drop_tasks_file << "start_us,work_us,duration_us,tsc,server_queue,server_time" << std::endl;
@@ -1065,6 +1068,7 @@ std::vector<work_unit> RunExperiment(
   std::cout << "offered: " << offered << std::endl;
   std::cout << "resps: " << resps << std::endl;
   std::cout << "elapsed: " << elapsed_ << std::endl;
+  #endif
   // END ERIC
 
   // Report results.
@@ -1215,6 +1219,7 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
   // std::sort(server_drop_tasks.begin(), server_drop_tasks.end(), [](const work_unit &s1, const work_unit &s2) {
   //   return s1.start_us < s2.start_us;
   // });
+  #if ENABLE_DOWNLOAD_ALL_TASKS
   std::ofstream server_drop_tasks_file;
   server_drop_tasks_file.open ("server_drop_tasks.csv");
   server_drop_tasks_file << "start_us,work_us,duration_us,tsc,server_queue,server_time" << std::endl;
@@ -1225,6 +1230,7 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
                            << server_drop_tasks[i].server_queue << "," << server_drop_tasks[i].server_time << std::endl;
   }
   server_drop_tasks_file.close();
+  #endif
   // END ERIC
 
   w.erase(std::remove_if(w.begin(), w.end(),
@@ -1252,6 +1258,7 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
     uint64_t server_time;
     uint64_t timing;
   */
+  #if ENABLE_DOWNLOAD_ALL_TASKS
   std::ofstream all_tasks_file;
   all_tasks_file.open ("all_tasks.csv");
   all_tasks_file << "start_us,work_us,duration_us,tsc,server_queue,server_time" << std::endl;
@@ -1261,6 +1268,7 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
                    << w[i].tsc << "," << w[i].server_queue << "," << w[i].server_time << std::endl;
   }
   all_tasks_file.close();
+  #endif
   ///// END ERIC
 
   std::sort(w.begin(), w.end(), [](const work_unit &s1, const work_unit &s2) {
