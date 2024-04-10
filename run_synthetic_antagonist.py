@@ -37,6 +37,9 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
         " configs/bw2_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
+BREAKWATER_TIMESERIES = True
+
+
 # Service time distribution
 #    exp: exponential
 #    const: constant
@@ -73,7 +76,7 @@ CALADAN_THRESHOLD = 10
 # TODO currently will only work with range policies I think?
 CALADAN_INTERVAL = 10
 BREAKWATER_CORE_PARKING = True
-SWB_CORE_PARK_TARGET = 1.0
+SBW_CORE_PARK_TARGET = 1.0
 
 DELAY_RANGE = False
 delay_lower = 0.5
@@ -144,7 +147,7 @@ if ST_DIST not in ["exp", "const", "bimod"]:
 
 ### Function definitions ###
 def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
-        directpath, spin, disable_watchdog, latency_critical=False, guaranteed_kthread=0, antagonist="none", breakwater_park_cores=False):
+        directpath, spin, disable_watchdog, latency_critical=False, guaranteed_kthread=0, antagonist="none"):
     config_name = ""
     config_string = ""
     if is_server:
@@ -167,7 +170,8 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
             config_string += "\nruntime_util_lower_thresh {:f}".format(utilization_lower)
             config_string += "\nruntime_util_upper_thresh {:f}".format(utilization_upper)
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
-            config_string += "\nbreakwater_prevent_parks {:f}".format(SWB_CORE_PARK_TARGET) # I don't think we want this behavior to be on anything but netbench w/breakwater
+            print("breakwater prevent parking going into server config")
+            config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET) # I don't think we want this behavior to be on anything but netbench w/breakwater
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
@@ -275,7 +279,7 @@ if IAS_DEBUG:
 print("Generating config files...")
 generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
                          NUM_CORES_LC, ENABLE_DIRECTPATH, SPIN_SERVER, DISABLE_WATCHDOG,
-                         latency_critical=True, guaranteed_kthread=NUM_CORES_LC_GUARANTEED, breakwater_park_cores=BREAKWATER_CORE_PARKING)
+                         latency_critical=True, guaranteed_kthread=NUM_CORES_LC_GUARANTEED)
 generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, False, DISABLE_WATCHDOG,
                          latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
@@ -308,6 +312,11 @@ if ENABLE_ANTAGONIST:
             " {}@{}:~/{}/{}/apps/netbench/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
+
+if BREAKWATER_TIMESERIES:
+    cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
+        " src/bw_server.c".format(ARTIFACT_PATH, KERNEL_NAME)
+    execute_remote([server_conn], cmd)
 
 # Rebuild Shanango
 print("Building Shenango/Caladan...")
@@ -488,6 +497,9 @@ elif DELAY_RANGE:
 else:
     eric_prefix += "_{}".format(SCHEDULER)
 
+if BREAKWATER_CORE_PARKING:
+    eric_prefix += "_park_{}".format(SBW_CORE_PARK_TARGET)
+
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
 # Print Headers
@@ -619,8 +631,10 @@ script_config += "RTT: {}\n".format(NET_RTT)
 script_config += "SLO: {}\n".format(slo)
 script_config += "Connections: {:d}\n".format(NUM_CONNS)
 script_config += "loadshift: {}\n".format(LOADSHIFT)
-script_config += "scheduler: {}".format(SCHEDULER)
-script_config += "allocation interval: {}".format(CALADAN_INTERVAL)
+script_config += "scheduler: {}\n".format(SCHEDULER)
+script_config += "allocation interval: {}\n".format(CALADAN_INTERVAL)
+script_config += "breakwater parking scheme: {}\n".format(BREAKWATER_CORE_PARKING)
+script_config += "breakwater parking scale factor: {}\n".format(SBW_CORE_PARK_TARGET)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)

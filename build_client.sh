@@ -23,6 +23,9 @@ elif lspci | grep -q 'ConnectX-3'; then
 fi
 # probably doesn't hurt, but I don't think I need spdk running, just dpdk
 # sed "s/CONFIG_SPDK=.*/CONFIG_SPDK=y/g" -i caladan/build/config
+# TODO remove, just debugging for now
+# sed "s/CONFIG_DEBUG=.*/CONFIG_DEBUG=y/g" -i caladan/build/config
+# sed "s/O0/O3/" -i caladan/build/shared.mk
 
 # TODO These seem to be not working, and it's forcing sequential with the jobserver
 pushd caladan

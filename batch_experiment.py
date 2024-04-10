@@ -12,10 +12,10 @@ conns = [100]
 loads = [0]
 breakwater_targets = [80]
 algorithms = ["breakwater"]
-schedulers = ["simple", "ias", "range_policy"]
+schedulers = ["simple", "ias"] # "range_policy"]
 delay_ranges = [[0.5, 1], [1, 4]]
 utilization_ranges = [[0.75, 0.95]]
-load_factors = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6]
+load_factors = [0.8,0.9,1.0,1.1,1.2]
 
 algorithm = "breakwater"
 scheduler = "simple"
@@ -24,7 +24,7 @@ service_time = 10
 breakwater_target = 80
 service_distribution = "exp"
 offered_load = 850000
-range_loads = 1 # commented out in code anyway for now to default to this multiple same load behavior
+range_loads = 1 # can comment out in code to use the multiple same load behavior
 loadshift = 0
 spin_server = 0
 num_cores_server = 18
@@ -34,7 +34,7 @@ caladan_threshold = 10
 slo = 200
 count = 1
 
-caladan_interval = 5
+caladan_interval = 10
 
 sched_delay = 0
 sched_utilization = 0
@@ -51,9 +51,14 @@ current_load_factor = 1.0
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    if count < 6:
-        count += 1
-        return
+    # if count < 3:
+    #     count += 1
+    #     return
+    # if count > 4:
+    #     exit()
+    # if count == 6:
+    #     count += 1
+    #     return
     count += 1
     # 5 per line
     config_remote.PARAM_EXP_FLAG = False  # set to True at end of the param synthetic file
@@ -61,12 +66,12 @@ def call_experiment():
               " {:d} {:d} {:d} {:d} {:d}"\
               " {:d} {:d} {:d} {:d} {:d}"\
               " {} {:d} {:f} {:f} {:d}"\
-              " {:f} {:f} {:f}".format(
+              " {:f} {:f} {:f} {:d}".format(
               algorithm, connections, service_time, breakwater_target, service_distribution,
               offered_load, loadshift, spin_server, num_cores_server, num_cores_lc,
               num_cores_lc_guaranteed, caladan_threshold, slo, avoid_large_downloads, range_loads,
               scheduler, sched_delay, delay_lower, delay_upper, sched_utilization,
-              utilization_lower, utilization_upper, current_load_factor
+              utilization_lower, utilization_upper, current_load_factor, caladan_interval
               ))
     if failure_code != 0:
         print("sys call failed, look at console or log")
@@ -131,8 +136,9 @@ def main():
         algorithm = a
         for c in conns:
             connections = c
-            for l in loads:
-                offered_load = l
+            for l in load_factors:
+                current_load_factor = l
+                # offered_load = l, for l in loads
                 for i in range(2):
                     if i == 0:
                         spin_server = 0
@@ -145,6 +151,7 @@ def main():
                             for s in schedulers:
                                 scheduler = s
                                 if s == "range_policy":
+                                    caladan_interval = 5
                                     for range_s in ["utilization", "delay"]:
                                         if range_s == "delay":
                                             for d in delay_ranges:
@@ -162,6 +169,7 @@ def main():
                                                 sched_utilization = 0
                                 else:
                                     # should call ias and simple
+                                    caladan_interval = 10
                                     call_experiment()
                         else:
                             scheduler = "simple"
@@ -174,6 +182,7 @@ def main():
                             for s in schedulers:
                                 scheduler = s
                                 if s == "range_policy":
+                                    caladan_interval = 5
                                     for range_s in ["utilization", "delay"]:
                                         if range_s == "delay":
                                             for d in delay_ranges:
@@ -190,8 +199,12 @@ def main():
                                                 call_experiment()
                                                 sched_utilization = 0
                                 else:
+                                    caladan_interval = 10
                                     call_experiment()
                         else:
+                            if l != load_factors[0]:
+                                continue
+                            caladan_interval = 10
                             scheduler = "simple"
                             call_experiment()
                                 

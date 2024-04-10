@@ -38,6 +38,8 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
         " configs/bw2_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
+BREAKWATER_TIMESERIES = True
+
 # Service time distribution
 #    exp: exponential
 #    const: constant
@@ -58,7 +60,7 @@ else:
     OFFERED_LOADS = [int(sys.argv[6])]
 
 # OFFERED_LOADS = [1000000, 1000000, 1000000, 1000000, 1000000]
-# current_load_factor = float(sys.argv[23])
+current_load_factor = float(sys.argv[23])
 # for i in range(len(OFFERED_LOADS)):
 #     OFFERED_LOADS[i] = int(OFFERED_LOADS[i] * current_load_factor)
 # OFFERED_LOADS = [400000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 2000000, 3000000]
@@ -79,6 +81,10 @@ NUM_CORES_LC_GUARANTEED = int(sys.argv[11])
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = int(sys.argv[12])
+CALADAN_INTERVAL = int(sys.argv[24])
+
+BREAKWATER_CORE_PARKING = True
+SBW_CORE_PARK_TARGET = current_load_factor
 
 AVOID_LARGE_DOWNLOADS = int(sys.argv[14])
 
@@ -92,7 +98,6 @@ ERIC_CSV_NAMING = True
 CSV_NAME_DIR = True
 
 SCHEDULER = sys.argv[16]
-CALADAN_INTERVAL = 5
 
 DELAY_RANGE = int(sys.argv[17])
 delay_lower = float(sys.argv[18])
@@ -158,6 +163,9 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if UTILIZATION_RANGE:
             config_string += "\nruntime_util_lower_thresh {:f}".format(utilization_lower)
             config_string += "\nruntime_util_upper_thresh {:f}".format(utilization_upper)
+        if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
+            print("breakwater prevent parking going into server config")
+            config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
@@ -261,6 +269,11 @@ if IAS_DEBUG:
             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
 
+if BREAKWATER_TIMESERIES:
+    cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
+        " src/bw_server.c".format(ARTIFACT_PATH, KERNEL_NAME)
+    execute_remote([server_conn], cmd)
+
 # Generating config files
 print("Generating config files...")
 generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
@@ -323,7 +336,7 @@ print("starting server IOKernel")
 if DELAY_RANGE or UTILIZATION_RANGE:
     cmd = "cd ~/{}/{} && sudo ./iokerneld simple range_policy interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, CALADAN_INTERVAL)
 else:
-    cmd = "cd ~/{}/{} && sudo ./iokerneld {} 2>&1 | ts %s > iokernel.node-0.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, SCHEDULER)
+    cmd = "cd ~/{}/{} && sudo ./iokerneld {} interval {:d} 2>&1 | ts %s > iokernel.node-0.log".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, SCHEDULER, CALADAN_INTERVAL)
 iok_sessions += execute_remote([server_conn], cmd, False)
 
 print("starting client/agent IOKernel")
@@ -491,6 +504,9 @@ elif DELAY_RANGE:
 else:
     eric_prefix += "_{}".format(SCHEDULER)
 
+if BREAKWATER_CORE_PARKING:
+    eric_prefix += "_park_{}".format(SBW_CORE_PARK_TARGET)
+
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
 # Print Headers
@@ -623,7 +639,9 @@ script_config += "SLO: {}\n".format(slo)
 script_config += "Connections: {:d}\n".format(NUM_CONNS)
 script_config += "loadshift: {}\n".format(LOADSHIFT)
 script_config += "scheduler: {}\n".format(SCHEDULER)
-script_config += "allocation interval: {}".format(CALADAN_INTERVAL)
+script_config += "allocation interval: {}\n".format(CALADAN_INTERVAL)
+script_config += "breakwater parking scheme: {}\n".format(BREAKWATER_CORE_PARKING)
+script_config += "breakwater parking scale factor: {}\n".format(SBW_CORE_PARK_TARGET)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
