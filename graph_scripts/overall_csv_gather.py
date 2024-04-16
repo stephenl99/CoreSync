@@ -6,7 +6,7 @@ if not os.path.exists("overall_csvs"):
     os.makedirs("overall_csvs")
 
 for current_dir in os.listdir():
-    if current_dir == "overall_csvs" or "bw_timeseries_csvs" or not ("conns" in current_dir):
+    if current_dir == "overall_csvs" or current_dir == "bw_timeseries_csvs" or not ("conns" in current_dir):
         continue
     os.chdir(current_dir)
     for f in os.listdir():
