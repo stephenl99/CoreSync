@@ -174,6 +174,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
             print("breakwater prevent parking going into server config")
             config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET)
+            config_string += "\nbreakwater_drop_threshold {:d}".format(BW_THRESHOLD)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\

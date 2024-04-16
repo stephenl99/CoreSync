@@ -12,10 +12,10 @@ conns = [100]
 loads = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000]
 breakwater_targets = [80]
 algorithms = ["breakwater"]
-schedulers = ["simple", "ias", "spin"] # "range_policy"]
+schedulers = ["simple", "ias", "range_policy", "spin"] # 
 delay_ranges = [[0.5, 1], [1, 4]]
 utilization_ranges = [[0.75, 0.95]]
-load_factors = [1.0, 0.9, 1.1] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
+load_factors = [0.1, 0.2, 0.4, 0.6, 0.8, 1.2, 1.4] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
 # need to do individual load runs in order to grab the timeseries each time.
 # uncertain of the best way to do this besides looping over loads AND over these loadfactors- will probably take forever
 
@@ -54,7 +54,7 @@ current_load_factor = 1.0
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    # if count < 3:
+    # if count < 2:
     #     count += 1
     #     return
     # if count > 4:
@@ -84,6 +84,7 @@ def call_experiment():
     print("algorithm: {}".format(algorithm))
     print("spinning: {}\nscheduler: {}\nsched_delay: {}".format(spin_server, scheduler, sched_delay))
     print("bw target: {}\ndelay_lower: {}\nutilization_lower {}".format(breakwater_target, delay_lower, utilization_lower))
+    print("breakwater parking: {}, load factor: {}\n".format(breakwater_parking, current_load_factor))
     print("sleeping for 5 seconds before next connection\n\n")
     sleep(5)
     # just for testing
@@ -115,24 +116,116 @@ def main():
     global sched_utilization
     global current_load_factor
     global breakwater_parking
+
+    breakwater_parking = 0
+    offered_load = 600000
+    spin_server = 1
+    for l in [600000, 700000]:
+        offered_load = l
+        for cores in [1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16]:
+            num_cores_server = cores
+            num_cores_lc = cores
+            num_cores_lc_guaranteed = cores
+            call_experiment()
+
     
-    for s in schedulers:
-        scheduler = s
-        for l in loads:
-            offered_load = l
-            if s == "spin":
-                scheduler = "simple"
-                spin_server = 1
-                num_cores_lc_guaranteed = 16
-                breakwater_parking = 0
-                call_experiment()
-                spin_server = 0
-                num_cores_lc_guaranteed = 0
-                breakwater_parking = 1
-            else:    
-                for lf in load_factors:
-                    current_load_factor = lf
-                    call_experiment()
+    # breakwater_parking = 1
+    # for s in schedulers:
+    #     scheduler = s
+    #     if s == "range_policy":
+    #         caladan_interval = 5
+    #         for range_s in ["utilization"]:
+    #             breakwater_parking = 0
+    #             if range_s == "delay":
+    #                 for d in delay_ranges:
+    #                     delay_lower = d[0]
+    #                     delay_upper = d[1]
+    #                     sched_delay = 1
+    #                     call_experiment()
+    #                     sched_delay = 0
+    #             elif range_s == "utilization":
+    #                 for u in utilization_ranges:
+    #                     utilization_lower = u[0]
+    #                     utilization_upper = u[1]
+    #                     sched_utilization = 1
+    #                     call_experiment()
+    #                     sched_utilization = 0
+    #             breakwater_parking = 1
+    #         caladan_interval = 10
+    #     elif s == "spin":
+    #         scheduler = "simple"
+    #         spin_server = 1
+    #         num_cores_lc_guaranteed = 16
+    #         breakwater_parking = 0
+    #         call_experiment()
+    #         spin_server = 0
+    #         num_cores_lc_guaranteed = 0
+    #         breakwater_parking = 1
+    #     else:    
+    #         for lf in load_factors:
+    #             current_load_factor = lf
+    #             call_experiment()
+    #         breakwater_parking = 0
+    #         call_experiment() # to get baseline for simple and ias too
+    #         breakwater_parking = 1
+
+
+    # breakwater_parking = 1
+    # for s in schedulers:
+    #     scheduler = s
+    #     for l in loads:
+    #         offered_load = l
+    #         if s == "range_policy":
+    #             caladan_interval = 5
+    #             for range_s in ["utilization"]:
+    #                 breakwater_parking = 0
+    #                 if range_s == "delay":
+    #                     for d in delay_ranges:
+    #                         delay_lower = d[0]
+    #                         delay_upper = d[1]
+    #                         sched_delay = 1
+    #                         call_experiment()
+    #                         sched_delay = 0
+    #                 elif range_s == "utilization":
+    #                     for u in utilization_ranges:
+    #                         utilization_lower = u[0]
+    #                         utilization_upper = u[1]
+    #                         sched_utilization = 1
+    #                         call_experiment()
+    #                         sched_utilization = 0
+    #                 breakwater_parking = 1
+    #             caladan_interval = 10
+    #         elif s == "spin":
+    #             scheduler = "simple"
+    #             spin_server = 1
+    #             num_cores_lc_guaranteed = 16
+    #             breakwater_parking = 0
+    #             call_experiment()
+    #             spin_server = 0
+    #             num_cores_lc_guaranteed = 0
+    #             breakwater_parking = 1
+    #         else:    
+    #             for lf in load_factors:
+    #                 current_load_factor = lf
+    #                 call_experiment()
+
+    # for s in schedulers:
+    #     scheduler = s
+    #     for l in loads:
+    #         offered_load = l
+    #         if s == "spin":
+    #             scheduler = "simple"
+    #             spin_server = 1
+    #             num_cores_lc_guaranteed = 16
+    #             breakwater_parking = 0
+    #             call_experiment()
+    #             spin_server = 0
+    #             num_cores_lc_guaranteed = 0
+    #             breakwater_parking = 1
+    #         else:    
+    #             for lf in load_factors:
+    #                 current_load_factor = lf
+    #                 call_experiment()
                 
                     
 
