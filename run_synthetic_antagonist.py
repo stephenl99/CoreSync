@@ -37,7 +37,7 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
         " configs/bw2_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
-BREAKWATER_TIMESERIES = False
+BREAKWATER_TIMESERIES = True
 
 
 # Service time distribution
@@ -55,28 +55,29 @@ ST_DIST = "exp"
 # OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
 # OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # OFFERED_LOADS = [3000000, 3500000, 4000000, 4500000, 5000000]
-OFFERED_LOADS = [1600000]
+OFFERED_LOADS = [1200000, 1300000, 1400000, 1500000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
 # schedulers = ["simple", "ias", "range_policy"]
-SCHEDULER = "simple"
+SCHEDULER = "ias"
 
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = True # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
+SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 18
 NUM_CORES_LC = 16
-NUM_CORES_LC_GUARANTEED = 16
+NUM_CORES_LC_GUARANTEED = 0
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
 # TODO currently will only work with range policies I think?
 CALADAN_INTERVAL = 10
-BREAKWATER_CORE_PARKING = False
-SBW_CORE_PARK_TARGET = 1.0
+BREAKWATER_CORE_PARKING = True
+SBW_CORE_PARK_TARGET = 0.6
+CORE_CREDIT_RATIO = 15
 
 DELAY_RANGE = False
 delay_lower = 0.5
@@ -178,7 +179,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
             print("breakwater prevent parking going into server config")
             config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET) # I don't think we want this behavior to be on anything but netbench w/breakwater
-            config_string += "\nbreakwater_drop_threshold {:d}".format(BW_THRESHOLD)
+            config_string += "\breakwater_core_credit_ratio {:d}".format(CORE_CREDIT_RATIO)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\

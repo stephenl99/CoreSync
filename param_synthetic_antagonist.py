@@ -87,6 +87,7 @@ CALADAN_INTERVAL = int(sys.argv[24])
 
 BREAKWATER_CORE_PARKING = int(sys.argv[25])
 SBW_CORE_PARK_TARGET = current_load_factor
+CORE_CREDIT_RATIO = int(sys.argv[26])
 
 AVOID_LARGE_DOWNLOADS = int(sys.argv[14])
 
@@ -186,7 +187,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
             print("breakwater prevent parking going into server config")
             config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET)
-            config_string += "\nbreakwater_drop_threshold {:d}".format(BW_THRESHOLD)
+            config_string += "\breakwater_core_credit_ratio {:d}".format(CORE_CREDIT_RATIO)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
