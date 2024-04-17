@@ -39,6 +39,8 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
 execute_local(cmd)
 
 BREAKWATER_TIMESERIES = True
+requested_timeseries = [600000, 700000]
+REBUILD = True
 
 # Service time distribution
 #    exp: exponential
@@ -53,7 +55,7 @@ ST_DIST = sys.argv[5]
 # OFFERED_LOADS = [400000, 800000, 1200000]
 RANGE_LOADS = int(sys.argv[15])
 if RANGE_LOADS:
-    OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000]
+    OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
     # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000,
     #              3500000, 4000000, 4500000]
 else:
@@ -131,6 +133,16 @@ antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 ############################
 ### End of configuration ###
 ############################
+
+curr_date = datetime.now().strftime("%m_%d_%Y")
+curr_time = datetime.now().strftime("%H-%M-%S")
+output_dir = "outputs/{}".format(curr_date)
+if not os.path.isdir(output_dir):
+   os.makedirs(output_dir)
+
+run_dir = output_dir + "/" + curr_time
+if not os.path.isdir(run_dir):
+   os.makedirs(run_dir)
 
 # SLO = 10 * (average RPC processing time + network RTT)
 NET_RTT = 10
@@ -250,42 +262,43 @@ sleep(1)
 cmd = "cd ~/{} && rm output.csv output.json".format(config_remote.ARTIFACT_PATH)
 execute_remote([client_conn], cmd, True, False)
 
-# Distribuing config files
-print("Distributing configs...")
-# - server
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
-        " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
-        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_local(cmd)
-# - client
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
-        " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
-        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_local(cmd)
-# - agents
-for agent in config_remote.AGENTS:
+if REBUILD:
+    # Distribuing config files
+    print("Distributing configs...")
+    # - server
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
             " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_local(cmd)
-
-# adding to server
-if IAS_DEBUG:
-    print("Replacing ias.h")
-    # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
-            " {}@{}:~/{}/{}/iokernel/"\
             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
+    # - client
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
+            " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
+            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_local(cmd)
+    # - agents
+    for agent in config_remote.AGENTS:
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no configs/*.h"\
+                " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
 
-if BREAKWATER_TIMESERIES:
-    cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
-        " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_remote([server_conn], cmd)
-else:
-    cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
-        " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_remote([server_conn], cmd)
+    # adding to server
+    if IAS_DEBUG:
+        print("Replacing ias.h")
+        # - server
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
+                " {}@{}:~/{}/{}/iokernel/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+
+    if BREAKWATER_TIMESERIES:
+        cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
+            " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_remote([server_conn], cmd)
+    else:
+        cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
+            " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_remote([server_conn], cmd)
 
 # Generating config files
 print("Generating config files...")
@@ -301,47 +314,50 @@ for i in range(NUM_AGENT):
     generate_shenango_config(False, agent_conns[i], agent_ips[i], netmask,
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
-# - server
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-        " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_local(cmd)
-# - client
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-        " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_local(cmd)
-# - agents
-for agent in config_remote.AGENTS:
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-        " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-        .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_local(cmd)
-
-if ENABLE_ANTAGONIST:
+if REBUILD:
     # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
-            " {}@{}:~/{}/{}/apps/netbench/"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_local(cmd)
+    # - client
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_local(cmd)
+    # - agents
+    for agent in config_remote.AGENTS:
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+
+    if ENABLE_ANTAGONIST:
+        # - server
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
+                " {}@{}:~/{}/{}/apps/netbench/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
 
 # Rebuild Shanango
-print("Building Shenango/Caladan...")
-cmd = "cd ~/{}/{} && make clean && make && make -C bindings/cc"\
-        .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
+    print("Building Shenango/Caladan...")
+    cmd = "cd ~/{}/{} && make clean && make && make -C bindings/cc"\
+            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
-# Build Breakwater
-print("Building Breakwater...")
-cmd = "cd ~/{}/{}/breakwater && make clean && make && make -C bindings/cc"\
-        .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
+    # Build Breakwater
+    print("Building Breakwater...")
+    cmd = "cd ~/{}/{}/breakwater && make clean && make && make -C bindings/cc"\
+            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
-# Build Netbench
-print("Building netbench...")
-cmd = "cd ~/{}/{}/breakwater/apps/netbench && make clean && make"\
-        .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
+    # Build Netbench
+    print("Building netbench...")
+    cmd = "cd ~/{}/{}/breakwater/apps/netbench && make clean && make"\
+            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
+else:
+    print("skipping build. breakwater config options and changes to netbench.cc and other files won't be done")
 
 # Execute IOKernel
 iok_sessions = []
@@ -453,6 +469,17 @@ for offered_load in OFFERED_LOADS:
         cmd = "sudo killall -9 stress"
         execute_remote([server_conn], cmd, True, False) # TODO
         server_stress_session[0].recv_exit_status()
+    
+    if BREAKWATER_TIMESERIES and offered_load in requested_timeseries:
+        print("grabbing bw_server timeseries")
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/timeseries.csv {}/"\
+            " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
+        execute_local(cmd)
+        with open("{}/timeseries.csv".format(run_dir)) as original:
+            data = original.read()
+        execute_local("rm {}/timeseries.csv".format(run_dir))
+        with open("{}/{}k_timeseries.csv".format(run_dir, int(offered_load / 1000)), "w+") as modified:
+            modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st\n" + data)
 
     sleep(1)
 
@@ -536,15 +563,15 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",client:resp_rx_pps,client:req_tx_pps"\
         ",client:credit_expired_cps,client:req_dropped_rps"
 
-curr_date = datetime.now().strftime("%m_%d_%Y")
-curr_time = datetime.now().strftime("%H-%M-%S")
-output_dir = "outputs/{}".format(curr_date)
-if not os.path.isdir(output_dir):
-   os.makedirs(output_dir)
+# curr_date = datetime.now().strftime("%m_%d_%Y")
+# curr_time = datetime.now().strftime("%H-%M-%S")
+# output_dir = "outputs/{}".format(curr_date)
+# if not os.path.isdir(output_dir):
+#    os.makedirs(output_dir)
 
-run_dir = output_dir + "/" + curr_time
-if not os.path.isdir(run_dir):
-   os.makedirs(run_dir)
+# run_dir = output_dir + "/" + curr_time
+# if not os.path.isdir(run_dir):
+#    os.makedirs(run_dir)
 
 cmd = "echo \"{}\" > {}/{}.csv".format(header, run_dir, curr_time + "-" + output_prefix)
 execute_local(cmd)
@@ -615,7 +642,7 @@ if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/client_drop_tasks.csv {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
-if BREAKWATER_TIMESERIES:
+if BREAKWATER_TIMESERIES and len(requested_timeseries) == 0:
     print("grabbing bw_server timeseries")
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/timeseries.csv {}/"\
         " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)

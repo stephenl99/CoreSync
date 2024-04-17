@@ -9,13 +9,13 @@ from datetime import datetime
 import random
 
 conns = [100]
-loads = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000]
+loads = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 breakwater_targets = [80]
 algorithms = ["breakwater"]
-schedulers = ["simple", "ias", "range_policy", "spin"] # 
+schedulers = ["simple", "ias"] # 
 delay_ranges = [[0.5, 1], [1, 4]]
 utilization_ranges = [[0.75, 0.95]]
-load_factors = [0.1, 0.2, 0.4, 0.6, 0.8, 1.2, 1.4] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
+load_factors = [0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
 # need to do individual load runs in order to grab the timeseries each time.
 # uncertain of the best way to do this besides looping over loads AND over these loadfactors- will probably take forever
 
@@ -26,7 +26,7 @@ service_time = 10
 breakwater_target = 80
 service_distribution = "exp"
 offered_load = 850000
-range_loads = 0 # can comment out in code to use the multiple same load behavior
+range_loads = 1 # can comment out in code to use the multiple same load behavior
 loadshift = 0
 spin_server = 0
 num_cores_server = 18
@@ -54,15 +54,11 @@ current_load_factor = 1.0
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    # if count < 2:
-    #     count += 1
-    #     return
-    # if count > 4:
-    #     exit()
-    # if count == 6:
+    # if count < 219:
     #     count += 1
     #     return
     count += 1
+    # return
     # 5 per line
     config_remote.PARAM_EXP_FLAG = False  # set to True at end of the param synthetic file
     failure_code = os.system("python3 param_synthetic_antagonist.py {} {:d} {:d} {:d} {}"\
@@ -117,18 +113,35 @@ def main():
     global current_load_factor
     global breakwater_parking
 
-    breakwater_parking = 0
-    offered_load = 600000
-    spin_server = 1
-    for l in [600000, 700000]:
-        offered_load = l
-        for cores in [1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16]:
-            num_cores_server = cores
-            num_cores_lc = cores
-            num_cores_lc_guaranteed = cores
+    # quick range loads for just ias and simple parking
+    breakwater_parking = 1
+    for lf in load_factors:
+        current_load_factor = lf
+        for s in schedulers:
+            scheduler = s
             call_experiment()
+    breakwater_parking = 0
+    for s in schedulers:
+        scheduler = s
+        call_experiment()
+    spin_server = 1
+    scheduler = "simple"
+    num_cores_lc_guaranteed = 16
+    call_experiment()
 
-    
+    # static curve, varying cores
+    # breakwater_parking = 0
+    # offered_load = 600000
+    # spin_server = 1
+    # for l in [600000, 700000]:
+    #     offered_load = l
+    #     for cores in [1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16]:
+    #         num_cores_server = cores
+    #         num_cores_lc = cores
+    #         num_cores_lc_guaranteed = cores
+    #         call_experiment()
+
+    # range of loads runs while varying the parking scale
     # breakwater_parking = 1
     # for s in schedulers:
     #     scheduler = s
@@ -170,6 +183,7 @@ def main():
     #         breakwater_parking = 1
 
 
+    # single loads, while varying parking scale
     # breakwater_parking = 1
     # for s in schedulers:
     #     scheduler = s
@@ -208,6 +222,9 @@ def main():
     #             for lf in load_factors:
     #                 current_load_factor = lf
     #                 call_experiment()
+    #             breakwater_parking = 0
+    #             call_experiment() # to get baseline for simple and ias too
+    #             breakwater_parking = 1
 
     # for s in schedulers:
     #     scheduler = s
