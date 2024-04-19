@@ -10,10 +10,11 @@ field_string = "offered_load,avg_cores,avg_credit_pool,avg_credit_issued\n"
 # if you change this, reflect it in csv header write as well
 
 load = "400k"
-loads = ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
-load_nums = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
-# parking_scales = [0.1, 0.2, 0.4, 0.6, 0.8, 1.2, 1.4]
-parking_scales = [0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4]
+# loads = ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
+# load_nums = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+loads = ["600k", "700k",]
+load_nums = [600000, 700000,]
+parking_scales = [0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 conns = 100
 nodes = 11
 breakwater_target = 80
@@ -24,9 +25,9 @@ avg_service_time = 10
 # utilization_range_0.75_0.95
 # delay_range_0.5_1.0
 # delay_range_1.0_4.0
-scheduler = "ias"
+scheduler = "simple"
 # parking_scale = 1.4
-parking_on = True
+parking_on = False
 spinning = False
 after_warmup_len = 4000000
 output_dir = "combined_timeseries"

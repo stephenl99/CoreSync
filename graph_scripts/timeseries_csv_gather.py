@@ -2,6 +2,8 @@ import os
 import sys
 import shutil
 
+middle_text = "400k"
+
 if not os.path.exists("bw_timeseries_csvs"):
     os.makedirs("bw_timeseries_csvs")
 for current_dir in os.listdir():
@@ -9,8 +11,10 @@ for current_dir in os.listdir():
         continue
     os.chdir(current_dir)
     for f in os.listdir():
-        if "timeseries" in f:
-            shutil.copy(f, "../bw_timeseries_csvs/ts_{}".format(current_dir + ".csv"))
-            print(current_dir)
+        if "timeseries" in f and ("600k" in f or "700k" in f): # remove this RHS if doing individual runs, but I don't think I'll readopt that idea
+            load_txt = f.split("_")[0]
+            file_name = current_dir.replace(middle_text, load_txt)
+            shutil.copy(f, "../bw_timeseries_csvs/ts_{}".format(file_name + ".csv"))
+            print(file_name)
     os.chdir("..")
 print("done")
