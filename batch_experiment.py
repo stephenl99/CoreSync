@@ -12,10 +12,10 @@ conns = [100]
 loads = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 breakwater_targets = [80]
 algorithms = ["breakwater"]
-schedulers = ["simple", "ias"] # 
+schedulers = ["ias", "simple"] # 
 delay_ranges = [[0.5, 1], [1, 4]]
 utilization_ranges = [[0.75, 0.95]]
-load_factors = [0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
+load_factors = [ 0.6, 0.2, 0.4, 0.5, 0.7, 0.8, 0.9, 1.0] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
 # need to do individual load runs in order to grab the timeseries each time.
 # uncertain of the best way to do this besides looping over loads AND over these loadfactors- will probably take forever
 
@@ -26,7 +26,7 @@ service_time = 10
 breakwater_target = 80
 service_distribution = "exp"
 offered_load = 850000
-range_loads = 1 # can comment out in code to use the multiple same load behavior
+range_loads = 0 # can comment out in code to use the multiple same load behavior
 loadshift = 0
 spin_server = 0
 num_cores_server = 18
@@ -50,11 +50,15 @@ avoid_large_downloads = 1
 breakwater_parking = 1
 
 current_load_factor = 1.0
+core_credit_ratio = 15
 
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    # if count < 219:
+    if count < 5:
+        count += 1
+        return
+    # if count < 5:
     #     count += 1
     #     return
     count += 1
@@ -65,14 +69,14 @@ def call_experiment():
               " {:d} {:d} {:d} {:d} {:d}"\
               " {:d} {:d} {:d} {:d} {:d}"\
               " {} {:d} {:f} {:f} {:d}"\
-              " {:f} {:f} {:f} {:d}"\
-              " {}".format(
+              " {:f} {:f} {:f} {:d} {}"\
+              " {:d}".format(
               algorithm, connections, service_time, breakwater_target, service_distribution,
               offered_load, loadshift, spin_server, num_cores_server, num_cores_lc,
               num_cores_lc_guaranteed, caladan_threshold, slo, avoid_large_downloads, range_loads,
               scheduler, sched_delay, delay_lower, delay_upper, sched_utilization,
-              utilization_lower, utilization_upper, current_load_factor, caladan_interval,
-              breakwater_parking
+              utilization_lower, utilization_upper, current_load_factor, caladan_interval, breakwater_parking,
+              core_credit_ratio,
               ))
     if failure_code != 0:
         print("sys call failed, look at console or log")
@@ -112,34 +116,58 @@ def main():
     global sched_utilization
     global current_load_factor
     global breakwater_parking
+    global core_credit_ratio
 
+    # TODO maybe re run these, and grab EVERY timeseries just for records sake
     # quick range loads for just ias and simple parking
-    breakwater_parking = 1
-    for lf in load_factors:
-        current_load_factor = lf
-        for s in schedulers:
-            scheduler = s
-            call_experiment()
+    # breakwater_parking = 1
+    # for lf in load_factors:
+    #     current_load_factor = lf
+    #     for s in schedulers:
+    #         scheduler = s
+    #         call_experiment()
+    # breakwater_parking = 0
+    # for s in schedulers:
+    #     scheduler = s
+    #     call_experiment()
+    # spin_server = 1
+    # scheduler = "simple"
+    # num_cores_lc_guaranteed = 16
+    # call_experiment()
+
+    # do utilization range and delay range calls here
     breakwater_parking = 0
-    for s in schedulers:
-        scheduler = s
-        call_experiment()
-    spin_server = 1
-    scheduler = "simple"
-    num_cores_lc_guaranteed = 16
-    call_experiment()
+    scheduler = "range_policy"
+    caladan_interval = 5
+    for range_s in ["utilization", "delay"]:
+        breakwater_parking = 0
+        if range_s == "delay":
+            for d in delay_ranges:
+                delay_lower = d[0]
+                delay_upper = d[1]
+                sched_delay = 1
+                call_experiment()
+                sched_delay = 0
+        elif range_s == "utilization":
+            for u in utilization_ranges:
+                utilization_lower = u[0]
+                utilization_upper = u[1]
+                sched_utilization = 1
+                call_experiment()
+                sched_utilization = 0
 
     # static curve, varying cores
-    # breakwater_parking = 0
-    # offered_load = 600000
-    # spin_server = 1
-    # for l in [600000, 700000]:
-    #     offered_load = l
-    #     for cores in [1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16]:
-    #         num_cores_server = cores
-    #         num_cores_lc = cores
-    #         num_cores_lc_guaranteed = cores
-    #         call_experiment()
+    breakwater_parking = 0
+    offered_load = 600000
+    spin_server = 1
+    scheduler = "simple"
+    for l in [600000, 700000]:
+        offered_load = l
+        for cores in [1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16]:
+            num_cores_server = cores
+            num_cores_lc = cores
+            num_cores_lc_guaranteed = cores
+            call_experiment()
 
     # range of loads runs while varying the parking scale
     # breakwater_parking = 1

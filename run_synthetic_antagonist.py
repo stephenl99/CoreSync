@@ -179,7 +179,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
             print("breakwater prevent parking going into server config")
             config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET) # I don't think we want this behavior to be on anything but netbench w/breakwater
-            config_string += "\breakwater_core_credit_ratio {:d}".format(CORE_CREDIT_RATIO)
+            config_string += "\nbreakwater_core_credit_ratio {:d}".format(CORE_CREDIT_RATIO)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\

@@ -40,7 +40,8 @@ execute_local(cmd)
 
 BREAKWATER_TIMESERIES = True
 requested_timeseries = [600000, 700000]
-REBUILD = True
+# requested_timeseries = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+REBUILD = False
 
 # Service time distribution
 #    exp: exponential
@@ -187,7 +188,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         if BREAKWATER_CORE_PARKING and antagonist == "none" and OVERLOAD_ALG == "breakwater":
             print("breakwater prevent parking going into server config")
             config_string += "\nbreakwater_prevent_parks {:f}".format(SBW_CORE_PARK_TARGET)
-            config_string += "\breakwater_core_credit_ratio {:d}".format(CORE_CREDIT_RATIO)
+            config_string += "\nbreakwater_core_credit_ratio {:d}".format(CORE_CREDIT_RATIO)
     else:
         config_name = "client.config"
         config_string = "host_addr {}".format(ip)\
