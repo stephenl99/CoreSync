@@ -6,21 +6,29 @@ import csv
 
 
 
-parking_scales = [0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-load = "600k"
-ts_index = 0 # because this will change easily... and I don't think I can grab a row so easily, since it's dictated by a floating value
+parking_scales = [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+core_credit_ratios = [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
+load = "600k" # doing ~600k or 700k for 10 us, what should it be for 1us? ~2 mil?
+ts_index = 2 # because this will change easily... and I don't think I can grab a row so easily, since it's dictated by a floating value
 overall_index = 2
 
+vary_parking = False
+vary_core_credit_ratio = True
 
 # print out initial headers
 print("just not doing spin, doing it manually now since it's annoying, wait we don't need spin anyway, due to the static core line")
 schedulers = ["ias", "simple", "utilization", "delay_1.0_4.0", "delay_0.5_1.0"]
 parking_schedulers = ["ias", "simple"]
 fields = []
-for s in parking_schedulers:
-    for ps in parking_scales:
-        fields.append(s + "_{}".format(ps))
-fields += schedulers
+if vary_parking:
+    for s in parking_schedulers:
+        for ps in parking_scales:
+            fields.append(s + "_{}".format(ps))
+elif vary_core_credit_ratio:
+    for s in parking_schedulers:
+        for ccr in core_credit_ratios:
+            fields.append(s + "_{}".format(ccr))
+# fields += schedulers
 fields.sort()
 # print(fields)
 csv_header = ",".join(fields) + "\n"

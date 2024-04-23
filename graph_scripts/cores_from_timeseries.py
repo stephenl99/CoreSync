@@ -12,35 +12,34 @@ field_string = "offered_load,avg_cores,avg_credit_pool,avg_credit_issued\n"
 load = "400k"
 # loads = ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
 # load_nums = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
-loads = ["600k", "700k",]
-load_nums = [600000, 700000,]
-parking_scales = [0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# loads = ["600k", "700k",]
+# load_nums = [600000, 700000,]
+
+# 1 US
+load_nums = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+loads = ["500k", "1000k", "1500k", "2000k", "2500k", "3000k", "3500k", "4000k", "4500k", "5000k", "5500k", "6000k", "6500k", "7000k"]
+
+parking_scales = [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+core_credit_ratios = [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
+default_parking_scale = 0.6
+default_ccr = 16
 conns = 100
 nodes = 11
-breakwater_target = 80
+breakwater_target = 45
 bw_thresh = breakwater_target * 2
-avg_service_time = 10
-# simple
-# ias
-# utilization_range_0.75_0.95
-# delay_range_0.5_1.0
-# delay_range_1.0_4.0
-scheduler = "simple"
-# parking_scale = 1.4
-parking_on = False
-spinning = False
+
+default_ccr_on = True
+default_parking_scale_on = False
 after_warmup_len = 4000000
 output_dir = "combined_timeseries"
 
-if not parking_on:
-    parking_scales = [0] # just make list 1 item long
 
-def generate_csv(parking_scale):
+def generate_csv(parking_scale, ccr, scheduler, parking_on):
     if parking_on and spinning:
         print("breakwater parking and spinning are enabled, are you sure about this?")
         exit()
 
-    parking = "_park_{}".format(parking_scale) if parking_on else ""
+    parking = "_park_{}_{}".format(parking_scale, ccr) if parking_on else ""
     spin = "guaranteed_spinning" if spinning else ""
 
     files = []
@@ -79,5 +78,35 @@ def generate_csv(parking_scale):
         for entry in combined_data:
             outfile.write("{:.4f},{:.4f},{:.4f},{:.4f}\n".format(entry[0], entry[1], entry[2], entry[3]))
 
-for ps in parking_scales:
-    generate_csv(ps)
+# simple
+# ias
+# utilization_range_0.75_0.95
+# delay_range_0.5_1.0
+# delay_range_1.0_4.0
+scheduler = "simple"
+# parking_scale = 1.4
+parking_on = True
+spinning = False
+
+if not parking_on:
+    parking_scales = [0] # just make list 1 item long
+
+if default_ccr_on:
+    core_credit_ratios = [default_ccr]
+if default_parking_scale_on or spinning:
+    parking_scales = [default_parking_scale]
+
+schedulers = ["ias", "simple", "utilization", "delay_1.0_4.0", "delay_0.5_1.0"]
+parking_schedulers = ["ias", "simple"]
+
+parking_on = True
+for s in parking_schedulers:
+    for ccr in core_credit_ratios:
+        for ps in parking_scales:
+            generate_csv(ps, ccr, s, True)
+
+for s in schedulers:
+    generate_csv(0, 0, s, False)
+
+spinning = True
+generate_csv(0, 0, "simple", False)

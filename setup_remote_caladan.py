@@ -15,6 +15,7 @@ if len(NODES) < 1:
 print("Changing default shell to bash...")
 conns = []
 for server in NODES:
+    print(server)
     server_conn = paramiko.SSHClient()
     server_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     server_conn.connect(hostname = server, username = USERNAME, pkey = k)

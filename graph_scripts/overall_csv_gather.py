@@ -11,6 +11,7 @@ for current_dir in os.listdir():
     os.chdir(current_dir)
     for f in os.listdir():
         if "breakwater" in f or "nocontrol" in f:
+            # os.rename(f, current_dir + ".csv") # just here for when I mess up and need to rename the files better
             shutil.copy(f, "../overall_csvs/")
             print(f)
     os.chdir("..")
