@@ -8,7 +8,11 @@ if not os.path.exists("overall_csvs"):
 
 data = []
 metrics = ["p99"]
-load = "600k"
+avg_service_time = 1
+if avg_service_time == 10:
+    load = "600k" # or 700k
+elif avg_service_time == 1:
+    load = "2000k"
 
 for current_dir in os.listdir():
     if current_dir == "overall_csvs" or current_dir == "bw_timeseries_csvs" or not ("conns" in current_dir):

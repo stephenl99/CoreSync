@@ -2,7 +2,7 @@ import os
 import sys
 import shutil
 
-middle_text = "500k" # make this 400k for 10 us, 500k for 1 us Or really just the "first load" we do in general
+middle_text = "400k" # make this 400k for 10 us, 500k for 1 us Or really just the "first load" we do in general
 
 if not os.path.exists("bw_timeseries_csvs"):
     os.makedirs("bw_timeseries_csvs")
@@ -18,4 +18,5 @@ for current_dir in os.listdir():
             shutil.copy(f, "../bw_timeseries_csvs/ts_{}".format(file_name + ".csv"))
             print(file_name)
     os.chdir("..")
+    # exit()
 print("done")

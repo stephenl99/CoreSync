@@ -3,33 +3,49 @@ import pandas
 import numpy as np
 import glob
 import csv
+import sys
 
 metrics = ["timestamp", "num_cores", "credit_pool", "credit_used"]
 fields = ["offered_load","avg_cores","avg_credit_pool","avg_credit_issued"]
 field_string = "offered_load,avg_cores,avg_credit_pool,avg_credit_issued\n"
 # if you change this, reflect it in csv header write as well
 
-load = "400k"
-# loads = ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
-# load_nums = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
-# loads = ["600k", "700k",]
-# load_nums = [600000, 700000,]
+avg_service_time = 10 # check on ccr, haven't defaulted that yet
 
-# 1 US
-load_nums = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
-loads = ["500k", "1000k", "1500k", "2000k", "2500k", "3000k", "3500k", "4000k", "4500k", "5000k", "5500k", "6000k", "6500k", "7000k"]
+restricted_loads = True
 
-parking_scales = [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-core_credit_ratios = [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
-default_parking_scale = 0.6
-default_ccr = 16
-conns = 100
-nodes = 11
-breakwater_target = 45
-bw_thresh = breakwater_target * 2
+parking_scales = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+core_credit_ratios = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
+default_parking_scale = 0.4
+default_ccr = 14
 
 default_ccr_on = True
 default_parking_scale_on = False
+
+if avg_service_time == 10:
+    if not restricted_loads:
+        loads = ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
+        load_nums = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+    else:
+        loads = ["600k", "700k",]
+        load_nums = [600000, 700000,]
+    breakwater_target = 80
+elif avg_service_time == 1:
+    # 1 US
+    if not restricted_loads:
+        load_nums = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+        loads = ["500k", "1000k", "1500k", "2000k", "2500k", "3000k", "3500k", "4000k", "4500k", "5000k", "5500k", "6000k", "6500k", "7000k"]
+    else:
+        load_nums = [2000000]
+        loads = ["2000k"]
+    breakwater_target = 45
+
+
+conns = 100
+nodes = 11
+bw_thresh = breakwater_target * 2
+
+
 after_warmup_len = 4000000
 output_dir = "combined_timeseries"
 
@@ -45,8 +61,10 @@ def generate_csv(parking_scale, ccr, scheduler, parking_on):
     files = []
 
     for l in loads:
-        # print("ts_breakwater_*{}_{}_*{}conns_{}nodes_{}{}.csv".format(spin, l, conns, nodes, scheduler, parking))
+        if len(sys.argv) > 1:
+            print("ts_breakwater_*{}_{}_*{}conns_{}nodes_{}{}.csv".format(spin, l, conns, nodes, scheduler, parking))
         f = glob.glob("ts_breakwater_*{}_{}_*{}conns_{}nodes_{}{}.csv".format(spin, l, conns, nodes, scheduler, parking))
+        
         files.append(f[0])
 
     # for f in files:
@@ -96,7 +114,7 @@ if default_ccr_on:
 if default_parking_scale_on or spinning:
     parking_scales = [default_parking_scale]
 
-schedulers = ["ias", "simple", "utilization", "delay_1.0_4.0", "delay_0.5_1.0"]
+# schedulers = ["ias", "simple", "utilization_range_0.75_0.95", "delay_range_1.0_4.0", "delay_range_0.5_1.0"]
 parking_schedulers = ["ias", "simple"]
 
 parking_on = True
@@ -105,8 +123,8 @@ for s in parking_schedulers:
         for ps in parking_scales:
             generate_csv(ps, ccr, s, True)
 
-for s in schedulers:
-    generate_csv(0, 0, s, False)
+# for s in schedulers:
+#     generate_csv(0, 0, s, False)
 
-spinning = True
-generate_csv(0, 0, "simple", False)
+# spinning = True
+# generate_csv(0, 0, "simple_shenango", False)

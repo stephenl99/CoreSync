@@ -8,23 +8,33 @@ import config_remote
 from datetime import datetime
 import random
 
+service_time = 10 # make sure the right loads are being done in param synthetic
 conns = [100]
-loads = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
-# loads = [500000, 1000000, 1500000, 1600000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000]
-breakwater_targets = [45]
+if service_time == 10:
+    loads = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+    breakwater_target = 80 # reccomended for 1 us service time and 10 us rtt
+    breakwater_targets = [80]
+    # breakwater_targets = [80, 60, 40]
+    slo = 200
+elif service_time == 1:
+    loads = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+    breakwater_target = 45 # reccomended for 1 us service time and 10 us rtt
+    breakwater_targets = [45]
+    slo = 110
 algorithms = ["breakwater"]
 schedulers = ["ias", "simple"] # 
 delay_ranges = [[0.5, 1], [1, 4]]
 utilization_ranges = [[0.75, 0.95]]
-load_factors = [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
+load_factors = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # going to do one additional run before running this where BREAKWATER_CORE_PARKING is off.
+ccr_values = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 # need to do individual load runs in order to grab the timeseries each time.
 # uncertain of the best way to do this besides looping over loads AND over these loadfactors- will probably take forever
 
 algorithm = "breakwater"
 scheduler = "simple"
 connections = 100
-service_time = 10 # make sure the right loads are being done in param synthetic
-breakwater_target = 80 # reccomended for 1 us service time and 10 us rtt
+
+
 service_distribution = "exp"
 offered_load = 850000
 range_loads = 1 # can comment out in code to use the multiple same load behavior
@@ -34,7 +44,6 @@ num_cores_server = 18
 num_cores_lc = 16
 num_cores_lc_guaranteed = 0
 caladan_threshold = 10
-slo = 200 # I messed this up for the 1 us runs, it should be 110
 count = 1
 
 caladan_interval = 10
@@ -56,10 +65,11 @@ core_credit_ratio = 16
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    if count < 41:
-        count += 1
-        return
+    # if count < 55:
+    #     count += 1
+    #     return
     count += 1
+    # return
     # return
     # 5 per line
     config_remote.PARAM_EXP_FLAG = False  # set to True at end of the param synthetic file
@@ -83,12 +93,106 @@ def call_experiment():
     print("algorithm: {}".format(algorithm))
     print("spinning: {}\nscheduler: {}\nsched_delay: {}".format(spin_server, scheduler, sched_delay))
     print("bw target: {}\ndelay_lower: {}\nutilization_lower {}".format(breakwater_target, delay_lower, utilization_lower))
-    print("breakwater parking: {}, load factor: {}\n".format(breakwater_parking, current_load_factor))
+    print("breakwater parking: {}, load factor: {}, core credit: {}\n".format(breakwater_parking, current_load_factor, core_credit_ratio))
     print("sleeping for 5 seconds before next connection\n\n")
     sleep(5)
     # just for testing
     # exit()
+def shenango_and_spin():
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor
+    global breakwater_parking
+    global core_credit_ratio
 
+    global range_loads
+
+    # breakwater_parking = 0
+    # spin_server = 0
+    # scheduler = "simple"
+    # caladan_interval = 5
+    # caladan_threshold = 5
+    # call_experiment()
+    # scheduler = "simple"
+    # spin_server = 1
+    # num_cores_lc_guaranteed = 16
+    # breakwater_parking = 0
+    # call_experiment()
+    # spin_server = 0
+    # num_cores_lc_guaranteed = 0
+    # breakwater_parking = 1
+def vary_core_credit_ratio():
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor
+    global breakwater_parking
+    global core_credit_ratio
+
+    global range_loads
+
+    service_time = 10
+    breakwater_target = 80
+    slo = 200
+
+    breakwater_parking = 1
+    spin_server = 0
+    current_load_factor = 0.4
+    # for lf in [0.4, 0.6]:
+    #     current_load_factor = lf
+    for ccr in ccr_values:
+        core_credit_ratio = ccr
+        for s in schedulers:
+            scheduler = s
+            call_experiment()
+    breakwater_parking = 0
+    spin_server = 1
+    scheduler = "simple"
+    num_cores_lc_guaranteed = 16
+    call_experiment()
+    spin_server = 0
+    num_cores_lc_guaranteed = 0
 def vary_parking_and_efficiency_plot():
     global algorithm
     global connections
@@ -122,6 +226,11 @@ def vary_parking_and_efficiency_plot():
     # TODO maybe re run these, and grab EVERY timeseries just for records sake.
     # MAKE SURE to set rebuild to true in the param file for the first run at least.
     # quick range loads for just ias and simple parking
+    
+    service_time = 10
+    breakwater_target = 80
+    slo = 200
+    core_credit_ratio = 13
     breakwater_parking = 1
     spin_server = 0
     for lf in load_factors:
@@ -130,7 +239,21 @@ def vary_parking_and_efficiency_plot():
             scheduler = s
             call_experiment()
     breakwater_parking = 0
-    # 1 us runs, think I did these
+
+    service_time = 1
+    breakwater_target = 45
+    slo = 110
+    core_credit_ratio = 13
+    breakwater_parking = 1
+    spin_server = 0
+    for lf in load_factors:
+        current_load_factor = lf
+        for s in schedulers:
+            scheduler = s
+            call_experiment()
+    breakwater_parking = 0
+
+    # spin run
     # for s in schedulers:
     #     scheduler = s
     #     call_experiment()
@@ -141,40 +264,134 @@ def vary_parking_and_efficiency_plot():
     # spin_server = 0
     # num_cores_lc_guaranteed = 0
 
-    # do utilization range and delay range calls here (1 us runs, didn't do these)
-    breakwater_parking = 0
-    scheduler = "range_policy"
-    caladan_interval = 5
-    for range_s in ["utilization", "delay"]:
-        breakwater_parking = 0
-        if range_s == "delay":
-            for d in delay_ranges:
-                delay_lower = d[0]
-                delay_upper = d[1]
-                sched_delay = 1
-                call_experiment()
-                sched_delay = 0
-        elif range_s == "utilization":
-            for u in utilization_ranges:
-                utilization_lower = u[0]
-                utilization_upper = u[1]
-                sched_utilization = 1
-                call_experiment()
-                sched_utilization = 0
+    # # do utilization range and delay range calls here
+    # breakwater_parking = 0
+    # scheduler = "range_policy"
+    # caladan_interval = 5
+    # for range_s in ["utilization", "delay"]:
+    #     breakwater_parking = 0
+    #     if range_s == "delay":
+    #         for d in delay_ranges:
+    #             delay_lower = d[0]
+    #             delay_upper = d[1]
+    #             sched_delay = 1
+    #             call_experiment()
+    #             sched_delay = 0
+    #     elif range_s == "utilization":
+    #         for u in utilization_ranges:
+    #             utilization_lower = u[0]
+    #             utilization_upper = u[1]
+    #             sched_utilization = 1
+    #             call_experiment()
+    #             sched_utilization = 0
 
-    # static curve, varying cores. turn off range loads before running
+    # static curve, varying cores. turn off range loads before running (FOR 1 us, figure out what "half capacity" should be)
     # range_loads = 0
     # breakwater_parking = 0
     # offered_load = 600000
     # spin_server = 1
     # scheduler = "simple"
-    # for l in [600000, 700000]:
+    # for l in [2000000]: # [600000, 700000]:
     #     offered_load = l
     #     for cores in [1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16]:
     #         num_cores_server = cores
     #         num_cores_lc = cores
     #         num_cores_lc_guaranteed = cores
     #         call_experiment()
+def vary_targets():
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor
+    global breakwater_parking
+    global core_credit_ratio
+
+    global range_loads
+    
+    range_loads = 1
+    breakwater_parking = 0
+    spin_server = 1
+    num_cores_lc_guaranteed = 16
+    scheduler = "simple"
+    breakwater_target = 80
+    service_time = 10
+    call_experiment()
+    spin_server = 0
+    num_cores_lc_guaranteed = 0
+
+    schedulers = ["range_policy", "ias"]
+    for s in schedulers:
+        scheduler = s
+        for t in breakwater_targets:
+            breakwater_target = t
+            if s == "range_policy":
+                sched_utilization = 1
+                call_experiment()
+                sched_utilization = 0
+            else:
+                call_experiment()
+
+def ablation():
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor
+    global breakwater_parking
+    global core_credit_ratio
+
+    global range_loads
+    
+    service_time = 10
+    breakwater_target = 80
+    slo = 200
+    core_credit_ratio = 0
+    current_load_factor = 0.4
+    breakwater_parking = 1
+    spin_server = 0
+
+
+
+
 def main():
     global algorithm
     global connections
@@ -205,6 +422,7 @@ def main():
 
     global range_loads
 
+
     # trying to do 1 us service times. Make sure to change service time in this file, and change the range loads
     # and also change the range loads so we grab the right timeseries
     # range_loads = 1
@@ -227,23 +445,6 @@ def main():
     # TODO maybe re run these, and grab EVERY timeseries just for records sake.
     # MAKE SURE to set rebuild to true in the param file for the first run at least.
     # quick range loads for just ias and simple parking
-    breakwater_parking = 1
-    spin_server = 0
-    current_load_factor = 0.4
-    for lf in [0.4, 0.6]:
-        current_load_factor = lf
-        for ccr in [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]:
-            core_credit_ratio = ccr
-            for s in schedulers:
-                scheduler = s
-                call_experiment()
-    breakwater_parking = 0
-    spin_server = 1
-    scheduler = "simple"
-    num_cores_lc_guaranteed = 16
-    call_experiment()
-    spin_server = 0
-    num_cores_lc_guaranteed = 0
 
 
     # range of loads runs while varying the parking scale
@@ -451,9 +652,9 @@ def main():
                     
 
 if __name__ == "__main__":
-    main()
+    # main()
     # vary_parking_and_efficiency_plot()
-
-
-
-
+    # vary_targets()
+    
+    # vary_core_credit_ratio()
+    vary_parking_and_efficiency_plot()

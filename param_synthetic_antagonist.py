@@ -39,9 +39,12 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
 execute_local(cmd)
 
 BREAKWATER_TIMESERIES = True
-# requested_timeseries = [600000, 700000]
-# requested_timeseries = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
-requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+if ST_AVG == 10:
+    requested_timeseries = [600000, 700000]
+    # requested_timeseries = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+elif ST_AVG == 1:
+    requested_timeseries = [2000000]
+    # requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
 REBUILD = True
 
 # Service time distribution
@@ -57,10 +60,10 @@ ST_DIST = sys.argv[5]
 # OFFERED_LOADS = [400000, 800000, 1200000]
 RANGE_LOADS = int(sys.argv[15])
 if RANGE_LOADS:
-    OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
-    # OFFERED_LOADS = [500000, 1000000, 1500000, 1600000, 2000000, 2500000, 3000000,
-    #              3500000, 4000000, 4500000]
-    # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+    if ST_AVG == 10:
+        OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+    elif ST_AVG == 1:
+        OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
 else:
     OFFERED_LOADS = [int(sys.argv[6])]
 
@@ -385,20 +388,6 @@ sleep(1)
 
 for offered_load in OFFERED_LOADS:
 
-    # Start shm query breakwater mem? what does this mean
-    # now, pretty sure membw means memory bandwidth
-    # print("Starting shm query breakwater")
-    # cmd = "cd ~/{} && export SHMKEY=102 &&"\
-    #     " sudo ./caladan/apps/netbench/stress_shm_query membw:1000 > mem.log 2>&1".format(config_remote.ARTIFACT_PATH)
-    # server_shmqueryBW_session = execute_remote([server_conn], cmd, False)
-    # sleep(1)
-
-    # # Start shm query from I guess swaptions?
-    # print("Starting shm query swaptions")
-    # cmd = "cd ~/{} && export SHMKEY=102 &&"\
-    #     " sudo ./caladan/apps/netbench/stress_shm_query 102:1000:17  > swaptionsGC_shm_query.out 2>&1".format(config_remote.ARTIFACT_PATH)
-    # server_shmquerySWAPTIONS_session = execute_remote([server_conn], cmd, False)
-    # sleep(1)
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
         cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
@@ -461,12 +450,6 @@ for offered_load in OFFERED_LOADS:
     # Wait for server to be killed
     server_session.recv_exit_status()
 
-    # kill shm query
-    # print("killing stress shm queries")
-    # cmd = "sudo killall -9 stress_shm_query"
-    # execute_remote([server_conn], cmd, True)
-    # server_shmqueryBW_session[0].recv_exit_status()
-    # server_shmquerySWAPTIONS_session[0].recv_exit_status()
     if ENABLE_ANTAGONIST:
         # kill antagonist
         print("killing server antagonist")
@@ -606,13 +589,12 @@ if ENABLE_ANTAGONIST:
 cmd = "rm output.csv"
 execute_local(cmd, False)
 
-if IAS_DEBUG:
-    # TODO put these all in one folder on server so I can just fetch with one command
-    if not AVOID_LARGE_DOWNLOADS:
-        print("iokernel log node 0")
-        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
-        execute_local(cmd)
+if not (IAS_DEBUG and AVOID_LARGE_DOWNLOADS):
+    print("iokernel log node 0")
+    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+        " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/caladan/iokernel.node-0.log {}/".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
+    execute_local(cmd)
+
 
 print("stdout node 0")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
@@ -698,6 +680,7 @@ script_config += "scheduler: {}\n".format(SCHEDULER)
 script_config += "allocation interval: {}\n".format(CALADAN_INTERVAL)
 script_config += "breakwater parking scheme: {}\n".format(BREAKWATER_CORE_PARKING)
 script_config += "breakwater parking scale factor: {}\n".format(SBW_CORE_PARK_TARGET)
+script_config += "breakwater core credit ratio: {}\n".format(CORE_CREDIT_RATIO)
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
