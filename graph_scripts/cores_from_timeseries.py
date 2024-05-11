@@ -10,22 +10,22 @@ fields = ["offered_load","avg_cores","avg_credit_pool","avg_credit_issued"]
 field_string = "offered_load,avg_cores,avg_credit_pool,avg_credit_issued\n"
 # if you change this, reflect it in csv header write as well
 
-avg_service_time = 10 # check on ccr, haven't defaulted that yet
+avg_service_time = 1 # check on ccr, haven't defaulted that yet
 
-restricted_loads = True
+restricted_loads = False
 
 parking_scales = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-core_credit_ratios = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
-default_parking_scale = 0.4
-default_ccr = 14
+core_credit_ratios = [15] # [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
+default_parking_scale = 0.2
+default_ccr = 15
 
-default_ccr_on = True
-default_parking_scale_on = False
+default_ccr_on = False
+default_parking_scale_on = True
 
 if avg_service_time == 10:
     if not restricted_loads:
-        loads = ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
-        load_nums = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+        loads = ["100k", "200k", "300k", "400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]# ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
+        load_nums = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
     else:
         loads = ["600k", "700k",]
         load_nums = [600000, 700000,]
@@ -56,15 +56,19 @@ def generate_csv(parking_scale, ccr, scheduler, parking_on):
         exit()
 
     parking = "_park_{}_{}".format(parking_scale, ccr) if parking_on else ""
-    spin = "guaranteed_spinning" if spinning else ""
+    spin = "_guaranteed_spinning" if spinning else ""
 
     files = []
 
     for l in loads:
         if len(sys.argv) > 1:
-            print("ts_breakwater_*{}_{}_*{}conns_{}nodes_{}{}.csv".format(spin, l, conns, nodes, scheduler, parking))
-        f = glob.glob("ts_breakwater_*{}_{}_*{}conns_{}nodes_{}{}.csv".format(spin, l, conns, nodes, scheduler, parking))
-        
+            print("ts_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
+        f = glob.glob("ts_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
+        if len(f) > 1:
+            print("too many files")
+            for fname in f:
+                print(f)
+            exit()
         files.append(f[0])
 
     # for f in files:
@@ -114,7 +118,7 @@ if default_ccr_on:
 if default_parking_scale_on or spinning:
     parking_scales = [default_parking_scale]
 
-# schedulers = ["ias", "simple", "utilization_range_0.75_0.95", "delay_range_1.0_4.0", "delay_range_0.5_1.0"]
+schedulers = ["ias", "simple", "utilization_range_0.75_0.95", "delay_range_1.0_4.0", "delay_range_0.5_1.0"]
 parking_schedulers = ["ias", "simple"]
 
 parking_on = True
@@ -127,4 +131,6 @@ for s in parking_schedulers:
 #     generate_csv(0, 0, s, False)
 
 # spinning = True
-# generate_csv(0, 0, "simple_shenango", False)
+# generate_csv(0, 0, "simple", False)
+
+# generate_csv(0.4, 15, "ias", True)

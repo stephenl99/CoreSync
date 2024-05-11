@@ -10,18 +10,18 @@ parking_scales = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]# [0.1, 0.2, 
 core_credit_ratios = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
 
 avg_service_time = 10
-vary_parking = True
-vary_core_credit_ratio = False
-scheduler = "ias"
+vary_parking = False
+vary_core_credit_ratio = True
+scheduler = "simple"
 
 if avg_service_time == 10:
     load = "1100k" # doing ~600k or 700k for 10 us, what should it be for 1us? ~2 mil?
     # ts_index = 2 # because this will change easily... and I don't think I can grab a row so easily, since it's dictated by a floating value
-    overall_index = 7
+    overall_index = 9 # 8 for 1.2 mil?
 elif avg_service_time == 1:
     load = "3500k"
     # ts_index = 3
-    overall_index = 6
+    overall_index = 6 # 7 for 4 mil? 6 for 3.5 mil
 
 if vary_parking:
     csv_header = "parking_scale,p99\n"

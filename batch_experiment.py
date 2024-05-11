@@ -60,12 +60,12 @@ avoid_large_downloads = 1
 breakwater_parking = 1
 
 current_load_factor = 1.0
-core_credit_ratio = 16
+core_credit_ratio = 15
 
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    # if count < 55:
+    # if count < 2:
     #     count += 1
     #     return
     count += 1
@@ -330,24 +330,26 @@ def vary_targets():
     
     range_loads = 1
     breakwater_parking = 0
-    spin_server = 1
-    num_cores_lc_guaranteed = 16
-    scheduler = "simple"
-    breakwater_target = 80
-    service_time = 10
-    call_experiment()
-    spin_server = 0
-    num_cores_lc_guaranteed = 0
+    # spin_server = 1
+    # num_cores_lc_guaranteed = 16
+    # scheduler = "simple"
+    # breakwater_target = 80
+    # service_time = 10
+    # call_experiment()
+    # spin_server = 0
+    # num_cores_lc_guaranteed = 0
 
-    schedulers = ["range_policy", "ias"]
+    schedulers = ["range_policy"] # "ias"]
     for s in schedulers:
         scheduler = s
-        for t in breakwater_targets:
+        for t in [80, 60, 40]:
             breakwater_target = t
             if s == "range_policy":
+                caladan_interval = 5
                 sched_utilization = 1
                 call_experiment()
                 sched_utilization = 0
+                caladan_interval = 10
             else:
                 call_experiment()
 
@@ -389,7 +391,90 @@ def ablation():
     breakwater_parking = 1
     spin_server = 0
 
+def baselines():
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor
+    global breakwater_parking
+    global core_credit_ratio
 
+    global range_loads
+
+    range_loads = 1
+    breakwater_parking = 0
+
+    for st in [10]:
+        service_time = st
+        for s in ["ias", "simple", "range_policy", "spin"]:
+            scheduler = s
+            if s == "range_policy":
+                caladan_interval = 5
+                for range_s in ["delay", "utilization"]: # "utilization",  ran this
+                    if range_s == "delay":
+                        for d in delay_ranges:
+                            delay_lower = d[0]
+                            delay_upper = d[1]
+                            sched_delay = 1
+                            call_experiment()
+                            sched_delay = 0
+                    elif range_s == "utilization":
+                        for u in utilization_ranges:
+                            utilization_lower = u[0]
+                            utilization_upper = u[1]
+                            sched_utilization = 1
+                            call_experiment()
+                            sched_utilization = 0
+                caladan_interval = 10
+            elif s == "spin":
+                scheduler = "simple"
+                spin_server = 1
+                num_cores_lc_guaranteed = 16
+                call_experiment()
+                spin_server = 0
+                num_cores_lc_guaranteed = 0
+            elif s == "simple":
+                caladan_interval = 5
+                caladan_threshold = 5
+                for i in range(2):
+                    call_experiment()
+                caladan_interval = 10
+                caladan_threshold = 10
+            else:
+                caladan_interval = 10
+                call_experiment()
+    caladan_interval = 10
+    breakwater_parking = 1
+    current_load_factor = 0.4
+    core_credit_ratio = 15
+    for s in ["ias", "simple"]:
+        scheduler = s
+        if scheduler == "ias":
+            for i in range(5):
+                call_experiment()
+        else:
+            call_experiment()
+    
 
 
 def main():
@@ -655,6 +740,85 @@ if __name__ == "__main__":
     # main()
     # vary_parking_and_efficiency_plot()
     # vary_targets()
+    # range_loads = 0
+    # offered_load = 2000000
+    # num_cores_lc_guaranteed = 16
+
+    # breakwater_parking = 1
+    # caladan_interval = 10
+    # core_credit_ratio = 15
+    # current_load_factor = 0.4
+    # breakwater_target = 45
+    # slo = 110
+    # service_time = 1
+    # for s in ["simple"]:
+    #     scheduler = s
+    #     call_experiment() # should be the no fix experiment
     
+    # breakwater_parking = 0
+    # caladan_interval = 5
+    # scheduler = "range_policy"
+    # sched_utilization = 1
+    # call_experiment()
+    # sched_utilization = 0
+    
+    # breakwater_parking = 1
+    # offered_load = 600000
+    # caladan_interval = 10
+    # core_credit_ratio = 15
+    # current_load_factor = 0.4
+    # breakwater_target = 80
+    # slo = 200
+    # service_time = 10
+    # for s in ["ias"]:
+    #     scheduler = s
+    #     call_experiment() # should be the no fix experiment
+    
+    # breakwater_parking = 0
+    # caladan_interval = 5
+    # scheduler = "range_policy"
+    # sched_utilization = 1
+    # call_experiment()
+    # sched_utilization = 0
+
+
+    # algorithm = "nocontrol"
+    # sched_utilization = 1
+    # call_experiment()
+
+
+    scheduler = "ias"
+    range_loads = 1
+    service_time = 1
+    slo = 110
+    breakwater_target = 45
+    breakwater_parking = 1
+    core_credit_ratio = 15
+    current_load_factor = 0.2
+    call_experiment()
+    # call_experiment()
+
+
+
+
+
+
+
+
+
+
+    # breakwater_parking = 0
+    # caladan_interval = 5
+    # caladan_threshold = 5
+    # scheduler = "simple"
+    # service_time = 1
+    # breakwater_target = 45 # reccomended for 1 us service time and 10 us rtt
+    # breakwater_targets = [45]
+    # slo = 110
+    # call_experiment()
+
     # vary_core_credit_ratio()
-    vary_parking_and_efficiency_plot()
+    # vary_parking_and_efficiency_plot()
+    # baselines()
+
+    

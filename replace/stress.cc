@@ -57,8 +57,8 @@ void MainHandler(void *arg) {
               .count();
       for (int i = 0; i < threads; i++) total += cnt[i];
       preempt_disable();
-      // log_info("%f", static_cast<double>(total - last_total) / duration);
-      std::cout << track_time << "," << static_cast<double>(total - last_total) / duration) << std::endl;
+      log_info("%f,%f", track_time, static_cast<double>(total - last_total) / duration);
+      // std::cout << track_time << "," << static_cast<double>(total - last_total) / duration) << std::endl;
       preempt_enable();
       track_time += duration;
       last_total = total;

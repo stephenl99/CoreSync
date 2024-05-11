@@ -40,11 +40,11 @@ execute_local(cmd)
 
 BREAKWATER_TIMESERIES = True
 if ST_AVG == 10:
-    requested_timeseries = [600000, 700000]
-    # requested_timeseries = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+    # requested_timeseries = [600000, 700000]
+    requested_timeseries = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 elif ST_AVG == 1:
-    requested_timeseries = [2000000]
-    # requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+    # requested_timeseries = [2000000]
+    requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
 REBUILD = True
 
 # Service time distribution
@@ -60,8 +60,8 @@ ST_DIST = sys.argv[5]
 # OFFERED_LOADS = [400000, 800000, 1200000]
 RANGE_LOADS = int(sys.argv[15])
 if RANGE_LOADS:
-    if ST_AVG == 10:
-        OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
+    if ST_AVG == 10: # adding in 100k, 200k, and 300k
+        OFFERED_LOADS = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
     elif ST_AVG == 1:
         OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
 else:
@@ -124,7 +124,7 @@ utilization_lower = float(sys.argv[21])
 utilization_upper = float(sys.argv[22])
 
 # number of threads for antagonist
-threads = 4
+threads = 20
 # units of work each thread attempts at once
 work_units = 10
 # config string describing what type of antagonist worker, and other variables
@@ -259,8 +259,7 @@ for agent in config_remote.AGENTS:
 
 # Clean-up environment
 print("Cleaning up machines...")
-cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld && sudo killall -9 stress_shm_query"\
-      " && sudo killall -9 stress"
+cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld && sudo killall -9 stress"
 execute_remote([server_conn, client_conn] + agent_conns,
                cmd, True, False)
 sleep(1)
@@ -391,7 +390,7 @@ for offered_load in OFFERED_LOADS:
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
         cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
-                " {} > antagonist.csv 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
+                " {} > antagonist.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
         server_stress_session = execute_remote([server_conn], cmd, False)
         sleep(1)
 
