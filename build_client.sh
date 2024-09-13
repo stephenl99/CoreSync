@@ -11,6 +11,7 @@ echo "BASE_DIR = '${SCRIPTPATH}/'" > base_dir.py
 git submodule update --init -f --recursive caladan
 
 # apply breakwater patches
+# NOTE this will break current CoreSync, patches were applied as a commit to reconcile with efficient scheduling commits
 # . init_submodules.sh
 
 if lspci | grep -q 'ConnectX-5'; then

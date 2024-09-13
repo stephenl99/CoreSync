@@ -46,6 +46,12 @@ BREAKWATER_TIMESERIES = True
 #    bimod: bimodal
 ST_DIST = "exp"
 
+# SLO = 10 * (average RPC processing time + network RTT)
+NET_RTT = 10
+# slo = (ST_AVG + NET_RTT) * 10
+slo = 200
+# slo = 999999
+
 # List of offered load
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
@@ -64,7 +70,7 @@ SCHEDULER = "ias"
 
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = False # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
+SPIN_SERVER = False
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = 18
@@ -73,7 +79,7 @@ NUM_CORES_LC_GUARANTEED = 0
 NUM_CORES_CLIENT = 16
 
 CALADAN_THRESHOLD = 10
-# TODO currently will only work with range policies I think?
+# TODO double check this is working for non range_policy
 CALADAN_INTERVAL = 10
 BREAKWATER_CORE_PARKING = True
 SBW_CORE_PARK_TARGET = 0.6
@@ -137,11 +143,6 @@ antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
 ### End of configuration ###
 ############################
 
-# SLO = 10 * (average RPC processing time + network RTT)
-NET_RTT = 10
-# slo = (ST_AVG + NET_RTT) * 10
-slo = 200
-# slo = 999999
 
 # Verify configs #
 if OVERLOAD_ALG not in ["protego", "breakwater", "seda", "dagor", "nocontrol"]:

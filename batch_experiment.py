@@ -72,7 +72,6 @@ def call_experiment():
     # return
     # return
     # 5 per line
-    config_remote.PARAM_EXP_FLAG = False  # set to True at end of the param synthetic file
     # add -u param when running with nohup, so I can actually see output
     failure_code = os.system("python3 -u param_synthetic_antagonist.py {} {:d} {:d} {:d} {}"\
               " {:d} {:d} {:d} {:d} {:d}"\

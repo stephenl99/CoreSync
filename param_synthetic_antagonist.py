@@ -80,7 +80,7 @@ LOADSHIFT = int(sys.argv[7])
 #     OFFERED_LOADS[i] *= 10000
 
 ENABLE_DIRECTPATH = True
-SPIN_SERVER = int(sys.argv[8]) # off in protego synthetic, but on in breakwater (synthetic and memcached). Don't see description in papers
+SPIN_SERVER = int(sys.argv[8])
 DISABLE_WATCHDOG = False
 
 NUM_CORES_SERVER = int(sys.argv[9])
