@@ -56,17 +56,17 @@ slo = 200
 # OFFERED_LOADS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
 #                 110, 120, 130, 140, 150, 160]
 
-# OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 2000000]
+OFFERED_LOADS = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000]
 # OFFERED_LOADS = [400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000]
 # OFFERED_LOADS = [400000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000]
 # OFFERED_LOADS = [3000000, 3500000, 4000000, 4500000, 5000000]
-OFFERED_LOADS = [1200000, 1300000, 1400000, 1500000]
+# OFFERED_LOADS = [1200000, 1300000, 1400000, 1500000]
 # loadshift = 1 for load shifts in netbench.cc
 LOADSHIFT = 0
 
 # schedulers = ["simple", "ias", "range_policy"]
-SCHEDULER = "ias"
+SCHEDULER = "simple"
 
 
 ENABLE_DIRECTPATH = True
@@ -78,10 +78,10 @@ NUM_CORES_LC = 16
 NUM_CORES_LC_GUARANTEED = 0
 NUM_CORES_CLIENT = 16
 
-CALADAN_THRESHOLD = 10
+CALADAN_THRESHOLD = 5
 # TODO double check this is working for non range_policy
-CALADAN_INTERVAL = 10
-BREAKWATER_CORE_PARKING = True
+CALADAN_INTERVAL = 5
+BREAKWATER_CORE_PARKING = False
 SBW_CORE_PARK_TARGET = 0.6
 CORE_CREDIT_RATIO = 15
 
@@ -105,11 +105,11 @@ over the past interval (fraction of time spent handling tasks)
 falls outside the specified range.
 """
 
-AVOID_LARGE_DOWNLOADS = True
+AVOID_LARGE_DOWNLOADS = False
 
 
-DOWNLOAD_RAW = False
-if DOWNLOAD_RAW:
+DOWNLOAD_ALL_TASKS = True
+if DOWNLOAD_ALL_TASKS:
     cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
         " replace/netbench.cc"
     execute_local(cmd)
@@ -281,6 +281,13 @@ if IAS_DEBUG:
     # - server
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
             " {}@{}:~/{}/{}/iokernel/"\
+            .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
+    execute_local(cmd)
+
+if True:
+    print("replacing bw_server.c")
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/bw_server.c"\
+            " {}@{}:~/{}/{}/breakwater/src/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
@@ -549,7 +556,7 @@ if ERIC_CSV_NAMING:
     cmd = "mv {}/{}.csv {}/{}.csv".format(run_dir, curr_time + "-" + output_prefix, run_dir, eric_prefix)
     execute_local(cmd)
 
-if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
+if DOWNLOAD_ALL_TASKS and not AVOID_LARGE_DOWNLOADS:
     print("Fetching raw output (all non rejected tasks)")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(KEY_LOCATION, 
@@ -597,7 +604,7 @@ print("stdout client node 1")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
 execute_local(cmd)
-if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
+if DOWNLOAD_ALL_TASKS and not AVOID_LARGE_DOWNLOADS:
     print("server drop tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, run_dir)
@@ -616,7 +623,7 @@ if BREAKWATER_TIMESERIES:
         data = original.read()
     execute_local("rm {}/timeseries.csv".format(run_dir))
     with open("{}/timeseries.csv".format(run_dir), "w+") as modified:
-        modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st\n" + data)
+        modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)
 
 print("gathering config options for this experiment")
 config_dir = run_dir + "/config"

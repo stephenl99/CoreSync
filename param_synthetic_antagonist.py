@@ -8,6 +8,7 @@ import config_remote
 from datetime import datetime
 import random
 import sys
+import shutil
 
 ################################
 ### Experiemnt Configuration ###
@@ -38,14 +39,14 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
         " configs/bw2_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
-BREAKWATER_TIMESERIES = True
+BREAKWATER_TIMESERIES = int(sys.argv[28])
 if ST_AVG == 10:
     # requested_timeseries = [600000, 700000]
     requested_timeseries = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 elif ST_AVG == 1:
     # requested_timeseries = [2000000]
     requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
-REBUILD = True
+REBUILD = int(sys.argv[29])
 
 # Service time distribution
 #    exp: exponential
@@ -97,8 +98,8 @@ CORE_CREDIT_RATIO = int(sys.argv[26])
 
 AVOID_LARGE_DOWNLOADS = int(sys.argv[14])
 
-DOWNLOAD_RAW = False
-if DOWNLOAD_RAW:
+DOWNLOAD_ALL_TASKS = int(sys.argv[27])
+if DOWNLOAD_ALL_TASKS:
     cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
         " replace/netbench.cc"
     execute_local(cmd)
@@ -297,6 +298,13 @@ if REBUILD:
                 .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_local(cmd)
 
+    if True: # TODO either make it an option or something, don't want to always do this. Probably just write it to actual repo
+        print("replacing bw_server.c")
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/bw_server.c"\
+                " {}@{}:~/{}/{}/breakwater/src/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+
     if BREAKWATER_TIMESERIES:
         cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
             " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
@@ -305,6 +313,8 @@ if REBUILD:
         cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
             " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_remote([server_conn], cmd)
+    
+    
 
 # Generating config files
 print("Generating config files...")
@@ -457,7 +467,7 @@ for offered_load in OFFERED_LOADS:
         server_stress_session[0].recv_exit_status()
     
     if BREAKWATER_TIMESERIES and offered_load in requested_timeseries:
-        print("grabbing bw_server timeseries")
+        print("grabbing bw_server timeseries in loop, load:{}".format(offered_load))
         cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/timeseries.csv {}/"\
             " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
         execute_local(cmd)
@@ -570,7 +580,7 @@ if ERIC_CSV_NAMING:
     cmd = "mv {}/{}.csv {}/{}.csv".format(run_dir, curr_time + "-" + output_prefix, run_dir, eric_prefix)
     execute_local(cmd)
 
-if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
+if DOWNLOAD_ALL_TASKS and not AVOID_LARGE_DOWNLOADS:
     print("Fetching raw output (all non rejected tasks)")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
           " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/all_tasks.csv {}/".format(config_remote.KEY_LOCATION, 
@@ -617,7 +627,7 @@ print("stdout client node 1")
 cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/stdout.out {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
 execute_local(cmd)
-if DOWNLOAD_RAW and not AVOID_LARGE_DOWNLOADS:
+if DOWNLOAD_ALL_TASKS and not AVOID_LARGE_DOWNLOADS:
     print("server drop tasks")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
         " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/server_drop_tasks.csv {}/ >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
@@ -693,10 +703,23 @@ if IAS_DEBUG and not AVOID_LARGE_DOWNLOADS:
 if CSV_NAME_DIR:
     os.chdir(output_dir)
     if os.path.isdir(eric_prefix):
-        print("error, desired directory name is already an output directory")
+        print("error, {} is already an output directory".format(eric_prefix))
         exit()
     os.rename(curr_time, eric_prefix)
-    os.chdir("..")
+    os.chdir("../..")
+
+SPECIFIED_EXPERIMENT_NAME = sys.argv[30]
+if SPECIFIED_EXPERIMENT_NAME != "":
+    new_output_dir = output_dir + "/" + SPECIFIED_EXPERIMENT_NAME
+    new_name = new_output_dir + "/" + eric_prefix
+    if not os.path.isdir(new_output_dir):
+        os.makedirs(new_output_dir) #
+    if not os.path.isdir(new_name):
+        shutil.move(output_dir + "/" + eric_prefix, new_name)
+    else:
+        print("error, {} is already an output directory".format(new_name))
+        exit()
+        
 
 print("Done.")
 config_remote.PARAM_EXP_FLAG = True
