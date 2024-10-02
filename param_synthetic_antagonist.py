@@ -475,7 +475,7 @@ for offered_load in OFFERED_LOADS:
             data = original.read()
         execute_local("rm {}/timeseries.csv".format(run_dir))
         with open("{}/{}k_timeseries.csv".format(run_dir, int(offered_load / 1000)), "w+") as modified:
-            modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st\n" + data)
+            modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)
 
     sleep(1)
 
