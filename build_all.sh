@@ -29,7 +29,7 @@ export SHENANGODIR=$SCRIPTPATH/caladan
 # TODO
 # echo building MEMCACHED
 # pushd memcached
-# git checkout breakwater
+# # git checkout breakwater # this shouldn't be necessary once I point it correctly. Also isn't necessary right now when testing with no submodule
 # # INHO
 # ./version.sh
 # autoreconf -i

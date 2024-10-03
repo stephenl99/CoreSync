@@ -93,11 +93,11 @@ cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 &&"\
         " make -C bindings/cc".format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
 
-# TODO can be done in caladan build scripts
-# print("Setting up memcahced...")
-# cmd = "cd ~/{}/shenango-memcached && ./version.sh && autoreconf -i"\
-#         " && ./configure --with-shenango=../{}"\
-#         .format(ARTIFACT_PATH, KERNEL_NAME)
-# execute_remote(conns, cmd, True)
+# TODO actually might not work in build scripts, since I think breakwater needs to be built first
+print("Setting up memcahced...")
+cmd = "cd ~/{}/memcached && ./version.sh && autoreconf -i"\
+        " && ./configure --with-shenango=../{} && make clean && make"\
+        .format(ARTIFACT_PATH, KERNEL_NAME)
+execute_remote(conns, cmd, True)
 
 print("Done.")
