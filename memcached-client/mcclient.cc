@@ -64,8 +64,8 @@ std::ofstream csv_out;
 
 int total_agents = 1;
 // Total duration of the experiment in us
-constexpr uint64_t kWarmUpTime = 2000000;
-constexpr uint64_t kExperimentTime = 4000000;
+constexpr uint64_t kWarmUpTime = 4000000; // was 2000000
+constexpr uint64_t kExperimentTime = 8000000; // was 4000000
 // RTT
 constexpr uint64_t kRTT = 10;
 
