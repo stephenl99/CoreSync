@@ -9,7 +9,11 @@ from config_remote import *
 ################################
 ### Experiemnt Configuration ###
 ################################
+"""
 
+for timeseries, might just have to run this one at a time
+
+"""
 # Server overload algorithm (breakwater, seda, dagor, nocontrol)
 OVERLOAD_ALG = "breakwater"
 

@@ -71,6 +71,7 @@ constexpr uint64_t kRTT = 10;
 
 std::vector<double> offered_loads;
 double offered_load;
+int is_populating = 0;
 
 /* server-side stat */
 constexpr uint64_t kRPCSStatPort = 8002;
@@ -894,9 +895,14 @@ void ClientHandler(void *arg) {
     wname = std::string("usr");
   else
     wname = std::string("unknown");
-
-  json_out.open("output.json");
-  csv_out.open("output.csv", std::fstream::out | std::fstream::app);
+  if (is_populating) {
+    json_out.open("temp_output.json");
+    csv_out.open("temp_output.csv", std::fstream::out | std::fstream::app);
+  } else {
+    json_out.open("output.json");
+    csv_out.open("output.csv", std::fstream::out | std::fstream::app);
+  }
+  
   json_out << "[";
 
   /* Print Header */
@@ -960,9 +966,9 @@ int main(int argc, char *argv[]) {
     return -EINVAL;
   }
 
-  if (argc < 11) {
+  if (argc < 12) {
     std::cerr << "usage: [alg] [cfg_file] client [#threads] [remote_ip]"
-	    << " [SET|GET|USR] [max_key_idx] [slo] [npeers] [offered_load]"
+	    << " [SET|GET|USR] [max_key_idx] [slo] [npeers] [offered_load] [is_populating]"
 	    << std::endl;
     return -EINVAL;
   }
@@ -989,6 +995,7 @@ int main(int argc, char *argv[]) {
   slo = std::stoi(argv[8], nullptr, 0);
   total_agents += std::stoi(argv[9], nullptr, 0);
   offered_load = std::stod(argv[10], nullptr);
+  is_populating = std::stoi(argv[11], nullptr, 0);
 
   ret = runtime_init(argv[2], ClientHandler, NULL);
   if (ret) {

@@ -64,11 +64,13 @@ breakwater_timeseries = 1
 current_load_factor = 1.0
 core_credit_ratio = 15
 
-specified_experiment_name = ""
+specified_experiment_name = "None"
 
 # rebuild is needed if any changes require recomplilation, ex. timeseries involves changing
 # bw_server.c, so recompilation is needed. Can do it for first run, then turn off usually unless changing target delay, etc.
 rebuild = 1
+
+script_name = "param_synthetic_antagonist.py"
 
 def call_experiment():
     global count
@@ -81,12 +83,28 @@ def call_experiment():
     # return
     # 5 per line
     # add -u param when running with nohup, so I can actually see output
-    failure_code = os.system("python3 -u param_synthetic_antagonist.py {} {:d} {:d} {:d} {}"\
+    # print("python3 -u {}"\
+    #           " {} {:d} {:d} {:d} {}"\
+    #           " {:d} {:d} {:d} {:d} {:d}"\
+    #           " {:d} {:d} {:d} {:d} {:d}"\
+    #           " {} {:d} {:f} {:f} {:d}"\
+    #           " {:f} {:f} {:f} {:d} {}"\
+    #           " {:d} {:d} {:d} {:d} {}".format(script_name,
+    #           algorithm, connections, service_time, breakwater_target, service_distribution,
+    #           offered_load, loadshift, spin_server, num_cores_server, num_cores_lc,
+    #           num_cores_lc_guaranteed, caladan_threshold, slo, avoid_large_downloads, range_loads,
+    #           scheduler, sched_delay, delay_lower, delay_upper, sched_utilization,
+    #           utilization_lower, utilization_upper, current_load_factor, caladan_interval, breakwater_parking,
+    #           core_credit_ratio, download_all_tasks, breakwater_timeseries, rebuild, specified_experiment_name,
+    #           ))
+    # exit()
+    failure_code = os.system("python3 -u {}"\
+              " {} {:d} {:d} {:d} {}"\
               " {:d} {:d} {:d} {:d} {:d}"\
               " {:d} {:d} {:d} {:d} {:d}"\
               " {} {:d} {:f} {:f} {:d}"\
               " {:f} {:f} {:f} {:d} {}"\
-              " {:d} {:d} {:d} {:d} {}".format(
+              " {:d} {:d} {:d} {:d} {}".format(script_name,
               algorithm, connections, service_time, breakwater_target, service_distribution,
               offered_load, loadshift, spin_server, num_cores_server, num_cores_lc,
               num_cores_lc_guaranteed, caladan_threshold, slo, avoid_large_downloads, range_loads,
@@ -874,12 +892,13 @@ def shenango_misbehave():
     global download_all_tasks
     global breakwater_timeseries
     global specified_experiment_name
+    global rebuild
 
     
 
     range_loads = 0 # we will do them ourselves
     avoid_large_downloads = 0 #  we want tasks?
-    download_all_tasks = 1
+    download_all_tasks = 0
     breakwater_timeseries = 1
     rebuild = 0 # stop rebuilding after first run
 
@@ -911,9 +930,68 @@ def shenango_misbehave():
     #     call_experiment()
     #     run_count += 1
 
+def test_memcached():
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor
+    global breakwater_parking
+    global core_credit_ratio
+
+    global range_loads
+    global avoid_large_downloads
+    global download_all_tasks
+    global breakwater_timeseries
+    global specified_experiment_name
+    global script_name
+    global rebuild
+
+    script_name = "param_memcached_antagonist.py"
+
+    range_loads = 1
+    avoid_large_downloads = 0
+    download_all_tasks = 0
+    breakwater_timeseries = 1
+    rebuild = 1
+
+    breakwater_parking = 0
+    spin_server = 0
+    scheduler = "simple"
+    caladan_interval = 5
+    caladan_threshold = 5
+
+    service_time = 1 # required to get the right loads
+    # inho says 25... we'll see
+    breakwater_target = 25
+    slo = 50
+    breakwater_timeseries = 1
+
+    call_experiment()
+
 
 if __name__ == "__main__":
-    shenango_misbehave()
+    test_memcached()
+    # shenango_misbehave()
     # figure_1_4_5_6_7_11(arg_service_time=10)
     # figure_1_4_5_6_7_11(arg_service_time=1)
 

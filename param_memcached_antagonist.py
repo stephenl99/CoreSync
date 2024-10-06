@@ -13,6 +13,8 @@ import shutil
 ################################
 ### Experiemnt Configuration ###
 ################################
+MAX_KEY_INDEX = 100000
+POPULATING_LOAD = 200000
 
 # Server overload algorithm (protego, breakwater, seda, dagor, nocontrol)
 OVERLOAD_ALG = sys.argv[1]
@@ -45,7 +47,7 @@ if ST_AVG == 10:
     requested_timeseries = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 elif ST_AVG == 1:
     # requested_timeseries = [2000000]
-    requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+    requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000, 7500000, 8000000]
 REBUILD = int(sys.argv[29])
 
 # Service time distribution
@@ -64,7 +66,7 @@ if RANGE_LOADS:
     if ST_AVG == 10: # adding in 100k, 200k, and 300k
         OFFERED_LOADS = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
     elif ST_AVG == 1:
-        OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
+        OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000, 7500000, 8000000]
 else:
     OFFERED_LOADS = [int(sys.argv[6])]
 
@@ -260,7 +262,14 @@ for agent in config_remote.AGENTS:
 
 # Clean-up environment
 print("Cleaning up machines...")
-cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld && sudo killall -9 stress"
+cmd = "sudo killall -9 memcached"
+execute_remote([server_conn], cmd, True, False)
+
+cmd = "sudo killall -9 mcclient"
+execute_remote([client_conn] + agent_conns,
+               cmd, True, False)
+cmd = "sudo killall -9 iokerneld && sudo killall -9 stress_shm_query"\
+      " && sudo killall -9 stress"
 execute_remote([server_conn, client_conn] + agent_conns,
                cmd, True, False)
 sleep(1)
@@ -331,22 +340,6 @@ for i in range(NUM_AGENT):
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
 if REBUILD:
-    # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_local(cmd)
-    # - client
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_local(cmd)
-    # - agents
-    for agent in config_remote.AGENTS:
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
 
     if ENABLE_ANTAGONIST:
         # - server
@@ -367,11 +360,17 @@ if REBUILD:
             .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
     execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 
-    # Build Netbench
-    print("Building netbench...")
-    cmd = "cd ~/{}/{}/breakwater/apps/netbench && make clean && make"\
-            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
+    # Build Memcached
+    print("Building memcached...")
+    cmd = "cd ~/{}/memcached && make clean && make"\
+            .format(config_remote.ARTIFACT_PATH)
+    execute_remote([server_conn], cmd, True)
+
+    # Build McClient
+    print("Building mcclient...")
+    cmd = "cd ~/{}/memcached-client && make clean && make"\
+            .format(config_remote.ARTIFACT_PATH)
+    execute_remote([client_conn] + agent_conns, cmd, True)
 else:
     print("skipping build. breakwater config options and changes to netbench.cc and other files won't be done")
 
@@ -400,25 +399,39 @@ for offered_load in OFFERED_LOADS:
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
         cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
-                " {} > antagonist.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
+                " {} > antagonist.csv 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
         server_stress_session = execute_remote([server_conn], cmd, False)
         sleep(1)
 
     print("Load = {:d}".format(offered_load))
-    # Execute netbench application
-    # - server
-    print("\tExecuting server...")
-    cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
-            " {} server.config server >stdout.out 2>&1"\
-            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG)
+    # Start memcached
+    print("Starting Memcached server...")
+    cmd = "cd ~/{} && sudo ./memcached/memcached {} server.config"\
+            " -p 8001 -v -c 32768 -m 64000 -b 32768 -o hashpower=18 >stdout.out 2>&1"\
+            .format(config_remote.ARTIFACT_PATH, OVERLOAD_ALG)
     server_session = execute_remote([server_conn], cmd, False)
     server_session = server_session[0]
+
+    sleep(2)
+    print("Populating entries...")
+    cmd = "cd ~/{} && sudo ./memcached-client/mcclient {} client.config client {:d} {} SET"\
+            " {:d} {:d} {:d} {:d} 1 >stdout.out 2>&1"\
+            .format(config_remote.ARTIFACT_PATH, OVERLOAD_ALG, NUM_CONNS, server_ip, MAX_KEY_INDEX,
+                    slo, 0, POPULATING_LOAD)
+    client_session = execute_remote([client_conn], cmd, False)
+    client_session = client_session[0]
+
+    client_session.recv_exit_status()
+
     sleep(1)
+    # Remove temporary output
+    cmd = "cd ~/{} && rm temp_output.csv temp_output.json".format(config_remote.ARTIFACT_PATH)
+    execute_remote([client_conn], cmd, True, False)
 
     # getting PIDs
     # server netbench stress_shm_query swaptions iokerneld
     print("grab PIDs at server")
-    cmd = "cd ~ && echo netbench > PID.txt && pidof netbench >> PID.txt"
+    cmd = "cd ~ && echo memcached > PID.txt && pidof memcached >> PID.txt"
     execute_remote([server_conn], cmd, True)
     if ENABLE_ANTAGONIST:
         cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
@@ -428,23 +441,26 @@ for offered_load in OFFERED_LOADS:
     # cmd = "cd ~ && echo stress_shm_query >> PID.txt && pidof stress_shm_query >> PID.txt"
     # execute_remote([server_conn], cmd, True)
     sleep(1)
+    # get rid of pesky startup tracking in the timeseries
+    # cmd = "cd ~/{} && rm timeseries.csv".format(config_remote.ARTIFACT_PATH)
+    # execute_remote([server_conn], cmd, True, False)
+    # this breaks, need to be a better way to deal with it
 
-    # - client
+    # - clients
     print("\tExecuting client...")
     client_agent_sessions = []
-    cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
-            " {} client.config client {:d} {:f} {} {:d} {:d} {:d} {:d} {} {:d}"\
-            " >stdout.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG, NUM_CONNS,
-                    ST_AVG, ST_DIST, slo, NUM_AGENT, offered_load, LOADSHIFT, server_ip, 1)
+    cmd = "cd ~/{} && sudo ./memcached-client/mcclient {} client.config client {:d} {}"\
+            " USR {:d} {:d} {:d} {:d} 0 >stdout.out 2>&1"\
+            .format(config_remote.ARTIFACT_PATH, OVERLOAD_ALG, NUM_CONNS, server_ip,
+                    MAX_KEY_INDEX, slo, NUM_AGENT, offered_load)
     client_agent_sessions += execute_remote([client_conn], cmd, False)
 
     sleep(1)
-    
-    # - agent
+
+    # - Agents
     print("\tExecuting agents...")
-    cmd = "cd ~/{} && sudo ./{}/breakwater/apps/netbench/netbench"\
-            " {} client.config agent {} {:d} >stdout.out 2>&1"\
-            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG, client_ip, LOADSHIFT)
+    cmd = "cd ~/{} && sudo ./memcached-client/mcclient {} client.config agent {}"\
+            " >stdout.out 2>&1".format(config_remote.ARTIFACT_PATH, OVERLOAD_ALG, client_ip)
     client_agent_sessions += execute_remote(agent_conns, cmd, False)
 
     # Wait for client and agents
@@ -452,19 +468,28 @@ for offered_load in OFFERED_LOADS:
     for client_agent_session in client_agent_sessions:
         client_agent_session.recv_exit_status()
 
+    # sleep(2)
     # Kill server
-    cmd = "sudo killall -9 netbench"
+    cmd = "sudo killall -9 memcached"
     execute_remote([server_conn], cmd, True)
 
-    # Wait for server to be killed
+    # Wait for the server
     server_session.recv_exit_status()
 
+    # kill shm query
+    # print("killing stress shm queries")
+    # cmd = "sudo killall -9 stress_shm_query"
+    # execute_remote([server_conn], cmd, True)
+    # server_shmqueryBW_session[0].recv_exit_status()
+    # server_shmquerySWAPTIONS_session[0].recv_exit_status()
     if ENABLE_ANTAGONIST:
         # kill antagonist
         print("killing server antagonist")
         cmd = "sudo killall -9 stress"
         execute_remote([server_conn], cmd, True, False) # TODO
         server_stress_session[0].recv_exit_status()
+
+    sleep(1)
     
     if BREAKWATER_TIMESERIES and offered_load in requested_timeseries:
         print("grabbing bw_server timeseries in loop, load:{}".format(offered_load))
@@ -503,8 +528,8 @@ cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/output.csv ./"\
         " >/dev/null".format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH)
 execute_local(cmd)
 
-output_prefix = "{}".format(OVERLOAD_ALG)
-eric_prefix = "{}".format(OVERLOAD_ALG)
+output_prefix = "memcached_{}".format(OVERLOAD_ALG)
+eric_prefix = "memcached_{}".format(OVERLOAD_ALG)
 
 if OVERLOAD_ALG == "breakwater":
     eric_prefix += "_{:d}_{:d}".format(BW_TARGET, BW_THRESHOLD)
@@ -547,18 +572,13 @@ if BREAKWATER_CORE_PARKING:
 output_prefix += "_{}_{:d}_nconn_{:d}".format(ST_DIST, ST_AVG, NUM_CONNS)
 
 # Print Headers
-header = "num_clients,offered_load,throughput,goodput,cpu"\
-        ",min,mean,p50,p90,p99,p999,p9999,max"\
-        ",reject_min,reject_mean,reject_p50,reject_p99"\
-        ",p1_credit,mean_credit,p99_credit"\
-        ",p1_q,mean_q,p99_q,mean_stime,p99_stime,server:rx_pps,server:tx_pps"\
-        ",server:rx_bps,server:tx_bps,server:rx_drops_pps,server:rx_ooo_pps"\
-        ",server:cupdate_rx_pps,server:ecredit_tx_pps,server:credit_tx_cps"\
-        ",server:req_rx_pps,server:req_drop_rate,server:resp_tx_pps"\
-        ",client:min_tput,client:max_tput"\
-        ",client:ecredit_rx_pps,client:cupdate_tx_pps"\
-        ",client:resp_rx_pps,client:req_tx_pps"\
-        ",client:credit_expired_cps,client:req_dropped_rps"
+header = "num_clients,offered_load,throughput,goodput,cpu,min,mean,p50,p90,p99,p999,p9999"\
+        ",max,lmin,lmean,lp50,lp90,lp99,lp999,lp9999,lmax,p1_win,mean_win,p99_win,p1_q,mean_q,p99_q,server:rx_pps"\
+        ",server:tx_pps,server:rx_bps,server:tx_bps,server:rx_drops_pps,server:rx_ooo_pps"\
+        ",server:winu_rx_pps,server:winu_tx_pps,server:win_tx_wps,server:req_rx_pps"\
+        ",server:resp_tx_pps,client:min_tput,client:max_tput"\
+        ",client:winu_rx_pps,client:winu_tx_pps,client:resp_rx_pps,client:req_tx_pps"\
+        ",client:win_expired_wps,client:req_dropped_rps"
 
 # curr_date = datetime.now().strftime("%m_%d_%Y")
 # curr_time = datetime.now().strftime("%H-%M-%S")
