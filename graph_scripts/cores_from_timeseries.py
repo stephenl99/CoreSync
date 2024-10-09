@@ -19,8 +19,21 @@ core_credit_ratios = [15] # [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10
 default_parking_scale = 0.2
 default_ccr = 15
 
-default_ccr_on = False
+default_ccr_on = True
 default_parking_scale_on = True
+
+
+conns = 100
+nodes = 11
+
+after_warmup_len = 4000000
+output_dir = "combined_timeseries"
+memcached = True
+memcached_target = 45
+if memcached:
+    memcached_str = "_memcached"
+else:
+    memcached_str = ""
 
 if avg_service_time == 10:
     if not restricted_loads:
@@ -39,15 +52,10 @@ elif avg_service_time == 1:
         load_nums = [2000000]
         loads = ["2000k"]
     breakwater_target = 45
-
-
-conns = 100
-nodes = 11
+if memcached:
+    breakwater_target = memcached_target
 bw_thresh = breakwater_target * 2
 
-
-after_warmup_len = 4000000
-output_dir = "combined_timeseries"
 
 
 def generate_csv(parking_scale, ccr, scheduler, parking_on):
@@ -62,8 +70,8 @@ def generate_csv(parking_scale, ccr, scheduler, parking_on):
 
     for l in loads:
         if len(sys.argv) > 1:
-            print("ts_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
-        f = glob.glob("ts_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
+            print("ts{}_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(memcached_str, breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
+        f = glob.glob("ts{}_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(memcached_str, breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
         if len(f) > 1:
             print("too many files")
             for fname in f:
@@ -127,10 +135,10 @@ for s in parking_schedulers:
         for ps in parking_scales:
             generate_csv(ps, ccr, s, True)
 
-# for s in schedulers:
-#     generate_csv(0, 0, s, False)
+for s in schedulers:
+    generate_csv(0, 0, s, False)
 
-# spinning = True
-# generate_csv(0, 0, "simple", False)
+spinning = True
+generate_csv(0, 0, "simple", False)
 
 # generate_csv(0.4, 15, "ias", True)
