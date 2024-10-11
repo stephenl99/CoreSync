@@ -5,7 +5,7 @@ import glob
 import csv
 
 
-
+memcached = True
 parking_scales = [0.2]# [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]# [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 core_credit_ratios = [15]# [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
 avg_service_time = 1
@@ -17,6 +17,10 @@ elif avg_service_time == 1:
     load = "2000k"
     ts_index = 3  #  do 0 if just doing selected time series
     overall_index = 3 # 
+    if memcached:
+        load = "1500k"
+        ts_index = 2
+        overall_index = 2
 
 vary_parking = True # if just using defaults, aka one parking scale and one core credit ratio, leave this option on, it's fine
 # just make sure your list of parking scales is one element aka the one you're defaulting to.
