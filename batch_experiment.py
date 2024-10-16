@@ -550,13 +550,28 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
     else:
         print("invalid service time")
         return
+    # spin run
+    breakwater_parking = 0
+    caladan_interval = 10
+    caladan_threshold = 10
+    spin_server = 1
+    scheduler = "simple"
+    num_cores_lc_guaranteed = 16
+    # call_experiment()
+    spin_server = 0
+    num_cores_lc_guaranteed = 0
+    # exit()
     # the two schedulers that coresync works with
     core_credit_ratio = 15
     breakwater_parking = 1 # enable coresync
     spin_server = 0
-    for ps in [0.06, 0.07, 0.075, 0.08, 0.09, 0.1]: # let's test some parking scales
+    # parking_scales_temp = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.075, 0.08, 0.09, 0.1]
+    parking_scales_temp = [0.075]
+    if arg_service_time != 0:
+        parking_scales_temp = [current_load_factor]
+    for ps in parking_scales_temp: # let's test some parking scales
         current_load_factor = ps
-        for s in ["simple", "ias"]:
+        for s in ["ias"]: # ["simple", "ias"]
             if s == "simple":
                 caladan_interval = 5
                 caladan_threshold = 5
@@ -566,7 +581,7 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
             scheduler = s
             call_experiment()
     breakwater_parking = 0
-    # exit() # TODO remove, just want coresync for now
+    exit() # TODO remove, just want coresync for now
     # do utilization range and delay range calls here
     breakwater_parking = 0
     scheduler = "range_policy"
@@ -670,7 +685,7 @@ def repeats(count, arg_service_time=10, memcached_target=25):
     global rebuild
     specified_experiment_name = "10us_repeats_{}".format(count)
     download_all_tasks = 0
-    breakwater_timeseries = 0
+    breakwater_timeseries = 1
     rebuild = 1
     range_loads = 1
 
@@ -714,7 +729,7 @@ def repeats(count, arg_service_time=10, memcached_target=25):
             scheduler = s
             call_experiment()
     breakwater_parking = 0
-
+    exit() # TODO remove
     # non coresync shenango and caladan runs?
     for s in ["ias"]:
         if s == "simple":
@@ -1123,10 +1138,10 @@ def test_memcached():
 
 
 if __name__ == "__main__":
-    # for i in range(10):
-    #     repeats(i, arg_service_time=10)
-    figure_1_4_5_6_7_11(arg_service_time=0, memcached_target=25)
-    # figure_1_4_5_6_7_11(arg_service_time=0, memcached_target=45) # testing with sythetic 1 us breakwater target
+    for i in range(3):
+        repeats(i, arg_service_time=10)
+    # figure_1_4_5_6_7_11(arg_service_time=0, memcached_target=25)
+    # figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=45) # testing with sythetic 1 us breakwater target
 
     # vary_parking_and_efficiency_plot()
     # vary_targets()

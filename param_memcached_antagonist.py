@@ -13,6 +13,8 @@ import shutil
 ################################
 ### Experiemnt Configuration ###
 ################################
+EXTRA_TIMESERIES_DEBUG = True
+
 MAX_KEY_INDEX = 100000
 POPULATING_LOAD = 200000
 
@@ -306,6 +308,14 @@ if REBUILD:
                 " {}@{}:~/{}/{}/iokernel/"\
                 .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_local(cmd)
+    
+    # the below if True will replace bw_server.c for me
+    if EXTRA_TIMESERIES_DEBUG:
+        print("replacing sched.c")
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/sched.c"\
+                " {}@{}:~/{}/{}/runtime/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
 
     if True: # TODO either make it an option or something, don't want to always do this. Probably just write it to actual repo
         print("replacing bw_server.c")
@@ -500,7 +510,10 @@ for offered_load in OFFERED_LOADS:
             data = original.read()
         execute_local("rm {}/timeseries.csv".format(run_dir))
         with open("{}/{}k_timeseries.csv".format(run_dir, int(offered_load / 1000)), "w+") as modified:
-            modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)
+            if EXTRA_TIMESERIES_DEBUG:
+                modified.write("timestamp,credit_pool,credit_used,num_pending,delay,num_cores,avg_st,successes,total_reductions,credit_reduction,bad_actions\n" + data)
+            else:
+                modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)
 
     sleep(1)
 
