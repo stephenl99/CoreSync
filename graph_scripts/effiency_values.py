@@ -6,7 +6,7 @@ import csv
 
 
 memcached = True
-parking_scales = [0.2]# [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]# [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+parking_scales = [0.075]# [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]# [0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 core_credit_ratios = [15]# [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
 avg_service_time = 1
 if avg_service_time == 10:
@@ -89,7 +89,7 @@ directories.sort()
 print("make sure file order matches your effieciency.csv order!")
 values = []
 for f in directories:
-    if "spin" in f:
+    if "spin" in f or not ".csv" in f:
         continue
     p99 = pandas.read_csv(f)["p99"]
     val = int(p99[overall_index])

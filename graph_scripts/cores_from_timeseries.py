@@ -16,7 +16,7 @@ restricted_loads = False
 
 parking_scales = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 core_credit_ratios = [15] # [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
-default_parking_scale = 0.1
+default_parking_scale = 0.075
 default_ccr = 15
 
 default_ccr_on = True
@@ -135,7 +135,7 @@ for s in parking_schedulers:
         for ps in parking_scales:
             generate_csv(ps, ccr, s, True)
             # exit()
-exit()
+# exit()
 for s in schedulers:
     generate_csv(0, 0, s, False)
 

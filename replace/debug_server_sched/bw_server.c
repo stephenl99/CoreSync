@@ -26,6 +26,9 @@
 // #include <bw_server.h>
 extern atomic_t srpc_credit_pool;
 extern atomic_t srpc_credit_used;
+extern atomic64_t total_reductions;
+extern atomic_t credit_reduction;
+extern atomic64_t bad_actions;
 
 /* time-series output */
 #define SBW_TS_OUT		false
@@ -49,13 +52,16 @@ struct Event {
 	int credit_pool;
 	int credit_used;
 	int num_pending;
-	int num_drained;
-	int num_active;
-	int num_sess;
-	uint64_t delay;
+	// int num_drained;
+	// int num_active;
+	// int num_sess;
 	int num_cores;
+	uint64_t delay;
 	uint64_t avg_st;
-	uint64_t num_successes;
+	int num_successes;
+	int credit_reduction;
+	uint64_t total_reductions;
+	uint64_t bad_actions;
 };
 
 static struct Event events[TS_BUF_SIZE];
@@ -154,7 +160,7 @@ atomic64_t srpc_stat_req_rx_;
 atomic64_t srpc_stat_req_dropped_;
 atomic64_t srpc_stat_resp_tx_;
 // tracking throughput
-atomic64_t srpc_successes_;
+atomic_t srpc_successes_;
 
 #if SBW_TS_OUT
 static void printRecord()
@@ -166,12 +172,18 @@ static void printRecord()
 
 	for (i = 0; i < TS_BUF_SIZE; ++i) {
 		struct Event *event = &events[i];
-		fprintf(ts_out, "%lu,%d,%d,%d,%d,%d,%d,%lu,%d,%lu,%d\n",
+		// fprintf(ts_out, "%lu,%d,%d,%d,%d,%d,%d,%lu,%d,%lu,%d\n",
+		// 	event->timestamp, event->credit_pool,
+		// 	event->credit_used, event->num_pending,
+		// 	event->num_drained, event->num_active,
+		// 	event->num_sess, event->delay,
+		// 	event->num_cores, event->avg_st, event->num_successes);
+		fprintf(ts_out, "%lu,%d,%d,%d,%lu,%d,%lu,%d,%lu,%d,%lu\n",
 			event->timestamp, event->credit_pool,
 			event->credit_used, event->num_pending,
-			event->num_drained, event->num_active,
-			event->num_sess, event->delay,
-			event->num_cores, event->avg_st, event->num_successes);
+			event->delay,
+			event->num_cores, event->avg_st, event->num_successes,
+			event->total_reductions, event->credit_reduction, event->bad_actions);
 	}
 	fflush(ts_out);
 }
@@ -185,15 +197,18 @@ static void record(int credit_pool, uint64_t delay)
 	event->credit_pool = credit_pool;
 	event->credit_used = atomic_read(&srpc_credit_used);
 	event->num_pending = atomic_read(&srpc_num_pending);
-	event->num_drained = atomic_read(&srpc_num_drained);
-	event->num_active = atomic_read(&srpc_num_active);
-	event->num_sess = atomic_read(&srpc_num_sess);
+	// event->num_drained = atomic_read(&srpc_num_drained);
+	// event->num_active = atomic_read(&srpc_num_active);
+	// event->num_sess = atomic_read(&srpc_num_sess);
 	event->delay = delay;
 	event->num_cores = runtime_active_cores();
 	event->avg_st = atomic_read(&srpc_avg_st);
-	event->num_successes = atomic64_read(&srpc_successes_);
-	atomic64_write(&srpc_successes_, 0); // clear every time. Going to remove record that's not on the RTT
-
+	event->num_successes = atomic_read(&srpc_successes_);
+	atomic_write(&srpc_successes_, 0); // clear every time. Going to remove record that's not on the RTT
+	event->total_reductions = atomic64_read(&total_reductions);
+	event->credit_reduction = atomic_read(&credit_reduction);
+	atomic_write(&credit_reduction, 0);
+	event->bad_actions = atomic64_read(&bad_actions);
 	if (nextIndex == 0)
 		printRecord();
 }
@@ -318,7 +333,7 @@ static int srpc_send_completion_vector(struct sbw_session *s,
 #endif
 	atomic_sub_and_fetch(&srpc_num_pending, nrhdr);
 	atomic64_fetch_and_add(&srpc_stat_resp_tx_, nrhdr);
-	atomic64_fetch_and_add(&srpc_successes_, temp_successes);
+	atomic_fetch_and_add(&srpc_successes_, temp_successes);
 
 	if (unlikely(ret < 0))
 		return ret;

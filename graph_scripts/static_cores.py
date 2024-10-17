@@ -9,10 +9,13 @@ if not os.path.exists("overall_csvs"):
 data = []
 metrics = ["p99"]
 avg_service_time = 1
+memcached = True
 if avg_service_time == 10:
     load = "600k" # or 700k
 elif avg_service_time == 1:
     load = "2000k"
+    if memcached:
+        load = "1500k"
 
 for current_dir in os.listdir():
     if current_dir == "overall_csvs" or current_dir == "bw_timeseries_csvs" or not ("conns" in current_dir):
