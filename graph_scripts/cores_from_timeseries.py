@@ -10,25 +10,26 @@ fields = ["offered_load","avg_cores","avg_credit_pool","avg_credit_issued"]
 field_string = "offered_load,avg_cores,avg_credit_pool,avg_credit_issued\n"
 # if you change this, reflect it in csv header write as well
 
-avg_service_time = 1 # check on ccr, haven't defaulted that yet
+avg_service_time = 10 # check on ccr, haven't defaulted that yet
 
 restricted_loads = False
-
+# [0.05, 0.075, 0.1, 0.15, 0.2]
 parking_scales = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-core_credit_ratios = [15] # [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
-default_parking_scale = 0.075
+# [20]
+core_credit_ratios = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]# [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
+default_parking_scale = 0.4
 default_ccr = 15
 
 default_ccr_on = True
 default_parking_scale_on = True
-
+memcached = False
 
 conns = 100
 nodes = 11
 
 after_warmup_len = 4000000
 output_dir = "combined_timeseries"
-memcached = True
+
 memcached_target = 25
 if memcached:
     memcached_str = "_memcached"
@@ -40,8 +41,8 @@ if avg_service_time == 10:
         loads = ["100k", "200k", "300k", "400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]# ["400k", "500k", "600k", "700k", "800k", "900k", "1000k", "1100k", "1200k", "1300k", "1400k", "1600k", "2000k", "3000k"]
         load_nums = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
     else:
-        loads = ["600k", "700k",]
-        load_nums = [600000, 700000,]
+        loads = ["600k"]
+        load_nums = [600000,]
     breakwater_target = 80
 elif avg_service_time == 1:
     # 1 US
@@ -49,8 +50,8 @@ elif avg_service_time == 1:
         load_nums = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
         loads = ["500k", "1000k", "1500k", "2000k", "2500k", "3000k", "3500k", "4000k", "4500k", "5000k", "5500k", "6000k", "6500k", "7000k"]
     else:
-        load_nums = [2000000]
-        loads = ["2000k"]
+        load_nums = [ 2000000, 2500000, 3000000, 3500000, 4000000]# [2000000]
+        loads = ["2000k", "2500k", "3000k", "3500k", "4000k"] # ["2000k"]
     breakwater_target = 45
 if memcached:
     breakwater_target = memcached_target
@@ -70,6 +71,7 @@ def generate_csv(parking_scale, ccr, scheduler, parking_on):
 
     for l in loads:
         if len(sys.argv) > 1:
+            print(os.getcwd())
             print("ts{}_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(memcached_str, breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
         f = glob.glob("ts{}_breakwater_{}_{}{}_{}_*{}conns_{}nodes_{}{}.csv".format(memcached_str, breakwater_target, bw_thresh, spin, l, conns, nodes, scheduler, parking))
         if len(f) > 1:
@@ -135,11 +137,10 @@ for s in parking_schedulers:
         for ps in parking_scales:
             generate_csv(ps, ccr, s, True)
             # exit()
-# exit()
+
 for s in schedulers:
     generate_csv(0, 0, s, False)
 
 spinning = True
 generate_csv(0, 0, "simple", False)
 
-# generate_csv(0.4, 15, "ias", True)

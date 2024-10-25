@@ -487,7 +487,8 @@ park:
 	// read current outstanding credits
 	if (cfg_breakwater_prevent_parks) {
 		current_C_issued = atomic_read(&srpc_credit_used);
-		if (!notified_breakwater && atomic_read(&runningks) == maxks && current_C_issued < (cfg_CORE_CREDIT_RATIO * maxks)) {
+		// && atomic_read(&runningks) == maxks && current_C_issued < (cfg_CORE_CREDIT_RATIO * maxks)
+		if (!notified_breakwater && current_C_issued < (cfg_CORE_CREDIT_RATIO * atomic_read(&runningks))) {
 			// overloaded and at max cores: we should not be parking or reducing credits
 			goto again;
 		}

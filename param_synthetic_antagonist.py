@@ -482,7 +482,7 @@ for offered_load in OFFERED_LOADS:
             data = original.read()
         execute_local("rm {}/timeseries.csv".format(run_dir))
         with open("{}/{}k_timeseries.csv".format(run_dir, int(offered_load / 1000)), "w+") as modified:
-            if EXTRA_TIMESERIES_DEBUG:
+            if False:
                 modified.write("timestamp,credit_pool,credit_used,num_pending,delay,num_cores,avg_st,successes,total_reductions,credit_reduction,bad_actions\n" + data)
             else:
                 modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)

@@ -50,8 +50,8 @@ if ST_AVG == 10:
     requested_timeseries = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
 elif ST_AVG == 1:
     # requested_timeseries = [2000000]
-    requested_timeseries = [2000000, 2500000, 3000000, 3500000, 4000000]
-    # requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000, 7500000, 8000000]
+    # requested_timeseries = [2000000, 2500000, 3000000, 3500000, 4000000]
+    requested_timeseries = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
 REBUILD = int(sys.argv[29])
 
 # Service time distribution
@@ -70,8 +70,8 @@ if RANGE_LOADS:
     if ST_AVG == 10: # adding in 100k, 200k, and 300k
         OFFERED_LOADS = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
     elif ST_AVG == 1:
-        OFFERED_LOADS = [2000000, 2500000, 3000000, 3500000, 4000000]
-        # OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000, 7500000, 8000000]
+        # OFFERED_LOADS = [2000000, 2500000, 3000000, 3500000, 4000000]
+        OFFERED_LOADS = [500000, 1000000, 1500000, 2000000, 2500000, 3000000, 3500000, 4000000, 4500000, 5000000, 5500000, 6000000, 6500000, 7000000]
 else:
     OFFERED_LOADS = [int(sys.argv[6])]
 
@@ -513,7 +513,7 @@ for offered_load in OFFERED_LOADS:
             data = original.read()
         execute_local("rm {}/timeseries.csv".format(run_dir))
         with open("{}/{}k_timeseries.csv".format(run_dir, int(offered_load / 1000)), "w+") as modified:
-            if EXTRA_TIMESERIES_DEBUG:
+            if False: # EXTRA_TIMESERIES_DEBUG
                 modified.write("timestamp,credit_pool,credit_used,num_pending,delay,num_cores,avg_st,successes,total_reductions,credit_reduction,bad_actions\n" + data)
             else:
                 modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)

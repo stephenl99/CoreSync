@@ -75,7 +75,7 @@ script_name = "param_synthetic_antagonist.py"
 def call_experiment():
     global count
     print("experiment number: {}".format(count))
-    # if count < 3:
+    # if count < 2:
     #     count += 1
     #     return
     count += 1
@@ -522,7 +522,7 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
     global rebuild
 
     download_all_tasks = 0
-    breakwater_timeseries = 1
+    breakwater_timeseries = 1 # for now, with 4 nodes
     rebuild = 1
     range_loads = 1
 
@@ -560,28 +560,26 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
     # call_experiment()
     spin_server = 0
     num_cores_lc_guaranteed = 0
-    # exit()
+    # return
     # the two schedulers that coresync works with
-    core_credit_ratio = 15
+    core_credit_ratio = 30
     breakwater_parking = 1 # enable coresync
     spin_server = 0
-    # parking_scales_temp = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.075, 0.08, 0.09, 0.1]
     parking_scales_temp = [0.075]
     if arg_service_time != 0:
         parking_scales_temp = [current_load_factor]
+    
     for ps in parking_scales_temp: # let's test some parking scales
         current_load_factor = ps
-        for s in ["ias"]: # ["simple", "ias"]
-            if s == "simple":
-                caladan_interval = 5
-                caladan_threshold = 5
-            else:
-                caladan_interval = 10
-                caladan_threshold = 10
+        for s in ["ias",]:# "simple"]:
+            caladan_interval = 10
+            caladan_threshold = 10
             scheduler = s
-            call_experiment()
+            # call_experiment()
     breakwater_parking = 0
-    exit() # TODO remove, just want coresync for now
+    # return
+    # return # TODO remove
+    # exit() # TODO remove, just want coresync for now
     # do utilization range and delay range calls here
     breakwater_parking = 0
     scheduler = "range_policy"
@@ -605,7 +603,7 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
                 # exit() # temp TODO just want to run the util run
 
     # non coresync shenango and caladan runs?
-    for s in ["simple", "ias"]:
+    for s in ["ias", "simple"]:
         if s == "simple":
             caladan_interval = 5
             caladan_threshold = 5
@@ -614,6 +612,7 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
             caladan_threshold = 10
         scheduler = s
         call_experiment()
+    return
     # spin run
     caladan_interval = 10
     caladan_threshold = 10
@@ -623,7 +622,7 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
     call_experiment()
     spin_server = 0
     num_cores_lc_guaranteed = 0
-    
+    # return
     # static curve, varying cores. turn off range loads before running (FOR 1 us, figure out what "half capacity" should be)
     range_loads = 0
     breakwater_parking = 0
@@ -647,7 +646,103 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
             num_cores_lc = cores
             num_cores_lc_guaranteed = cores
             call_experiment()
+def sensitivity(arg_service_time=10, memcached_target=25):
+    global algorithm
+    global connections
+    global service_time
+    global breakwater_target
+    global service_distribution
+    global offered_load
+    global loadshift
+    global spin_server
+    global num_cores_server
+    global num_cores_lc
+    global num_cores_lc_guaranteed
+    global caladan_threshold
+    global slo
+    global scheduler
+    global delay_ranges
+    global utilization_ranges
+    global caladan_interval
+    global delay_lower
+    global delay_upper
+    global utilization_lower
+    global utilization_upper
+    global sched_delay
+    global sched_utilization
+    global current_load_factor # using this for parking scale
+    global breakwater_parking
+    global core_credit_ratio
+
+    global range_loads
+    global avoid_large_downloads
+    global download_all_tasks
+    global breakwater_timeseries
+    global specified_experiment_name
+    global script_name
+    global rebuild
+
+    download_all_tasks = 0
+    breakwater_timeseries = 1 # for now, with 4 nodes
+    rebuild = 1
+    range_loads = 0
+
+    # TODO maybe re run these, and grab EVERY timeseries just for records sake.
+    # MAKE SURE to set rebuild to true in the param file for the first run at least.
+    # quick range loads for just ias and simple parking
+    # st time of 0 is for memcached
+    if arg_service_time == 10:
+        service_time = 10
+        breakwater_target = 80
+        slo = 200
+        current_load_factor = 0.4
+        offered_load = 600000
+    elif arg_service_time == 1:
+        service_time = 1
+        breakwater_target = 45
+        slo = 110
+        current_load_factor = 0.2
+    elif arg_service_time == 0: ### memcached
+        service_time = 1 # important to set to 1 to get right offered loads and time series
+        breakwater_target = memcached_target # making this a param
+        slo = 50 if memcached_target == 25 else 110
+        current_load_factor = 0.2 # this is a guess
+        script_name = "param_memcached_antagonist.py"
+
+    else:
+        print("invalid service time")
+        return
+    # the two schedulers that coresync works with
+    core_credit_ratio = 15
+    breakwater_parking = 1 # enable coresync
+    spin_server = 0
+    # parking_scales_temp = [0.075, 0.05, 0.1, 0.15, 0.2]
+    parking_scales_temp = [0.1, 0.2] # [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    core_credit_ratios = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] # [5, 10, 12, 14, 15, 16, 18, 20, 22, 24, 30]
+    param_sensitivity = True
+    if arg_service_time != 0 and not param_sensitivity:
+        parking_scales_temp = [current_load_factor]
     
+    for ps in parking_scales_temp: # let's test some parking scales
+        current_load_factor = ps
+        for s in ["ias", "simple"]:
+            caladan_interval = 10
+            caladan_threshold = 10
+            scheduler = s
+            call_experiment()
+    current_load_factor = 0.4
+    for ccr in core_credit_ratios: # let's test some parking scales
+        if ccr == 15:
+            continue
+        core_credit_ratio = ccr
+        for s in ["ias", "simple"]:
+            caladan_interval = 10
+            caladan_threshold = 10
+            scheduler = s
+            # call_experiment()
+    breakwater_parking = 0
+
+
 def repeats(count, arg_service_time=10, memcached_target=25):
     global algorithm
     global connections
@@ -683,7 +778,7 @@ def repeats(count, arg_service_time=10, memcached_target=25):
     global specified_experiment_name
     global script_name
     global rebuild
-    specified_experiment_name = "10us_repeats_{}".format(count)
+    specified_experiment_name = "memcached_repeats_{}".format(count)
     download_all_tasks = 0
     breakwater_timeseries = 1
     rebuild = 1
@@ -707,7 +802,7 @@ def repeats(count, arg_service_time=10, memcached_target=25):
         service_time = 1 # important to set to 1 to get right offered loads and time series
         breakwater_target = memcached_target # making this a param
         slo = 50 if memcached_target == 25 else 110
-        current_load_factor = 0.2 # this is a guess
+        current_load_factor = 0.075 # this is a guess
         script_name = "param_memcached_antagonist.py"
 
     else:
@@ -717,21 +812,16 @@ def repeats(count, arg_service_time=10, memcached_target=25):
     core_credit_ratio = 15
     breakwater_parking = 1 # enable coresync
     spin_server = 0
-    for ps in [0.4]: # let's test some parking scales
-        current_load_factor = ps
-        for s in ["ias"]:
-            if s == "simple":
-                caladan_interval = 5
-                caladan_threshold = 5
-            else:
-                caladan_interval = 10
-                caladan_threshold = 10
-            scheduler = s
-            call_experiment()
+    # for ps in [0.4]: # let's test some parking scales
+    #     current_load_factor = ps
+    for s in ["ias", ]: # "simple"
+        caladan_interval = 10
+        caladan_threshold = 10
+        scheduler = s
+        call_experiment()
     breakwater_parking = 0
-    exit() # TODO remove
     # non coresync shenango and caladan runs?
-    for s in ["ias"]:
+    for s in ["ias","simple"]:
         if s == "simple":
             caladan_interval = 5
             caladan_threshold = 5
@@ -740,6 +830,27 @@ def repeats(count, arg_service_time=10, memcached_target=25):
             caladan_threshold = 10
         scheduler = s
         call_experiment()
+    breakwater_parking = 0
+    scheduler = "range_policy"
+    caladan_interval = 5
+    # just util
+    for range_s in ["utilization"]: 
+        breakwater_parking = 0
+        if range_s == "delay":
+            for d in delay_ranges:
+                delay_lower = d[0]
+                delay_upper = d[1]
+                sched_delay = 1
+                call_experiment()
+                sched_delay = 0
+        elif range_s == "utilization":
+            for u in utilization_ranges:
+                utilization_lower = u[0]
+                utilization_upper = u[1]
+                sched_utilization = 1
+                call_experiment()
+                sched_utilization = 0
+                # exit() # temp TODO just want to run the util run
     # spin run
     caladan_interval = 10
     caladan_threshold = 10
@@ -1138,9 +1249,9 @@ def test_memcached():
 
 
 if __name__ == "__main__":
-    for i in range(3):
-        repeats(i, arg_service_time=10)
-    # figure_1_4_5_6_7_11(arg_service_time=0, memcached_target=25)
+    sensitivity(arg_service_time=10)
+    # for temp_service_time in [1]:
+    #     figure_1_4_5_6_7_11(arg_service_time=temp_service_time)
     # figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=45) # testing with sythetic 1 us breakwater target
 
     # vary_parking_and_efficiency_plot()
