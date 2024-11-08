@@ -115,7 +115,8 @@ else:
         " replace/netbench.cc"
     execute_local(cmd)
 
-ENABLE_ANTAGONIST = False
+ENABLE_ANTAGONIST = int(sys.argv[31])
+print("antagonist is: {}".format(ENABLE_ANTAGONIST))
 
 IAS_DEBUG = False
 
@@ -384,6 +385,11 @@ if REBUILD:
     cmd = "cd ~/{}/memcached-client && make clean && make"\
             .format(config_remote.ARTIFACT_PATH)
     execute_remote([client_conn] + agent_conns, cmd, True)
+    # Build Caladan Netbench
+    print("Building CALADAN netbench...")
+    cmd = "cd ~/{}/{}/apps/netbench && make clean && make"\
+            .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
 else:
     print("skipping build. breakwater config options and changes to netbench.cc and other files won't be done")
 
@@ -412,7 +418,7 @@ for offered_load in OFFERED_LOADS:
     if ENABLE_ANTAGONIST:
         print("Starting server antagonist")
         cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
-                " {} > antagonist.csv 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
+                " {} > antagonist.log 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
         server_stress_session = execute_remote([server_conn], cmd, False)
         sleep(1)
 
@@ -626,7 +632,7 @@ if DOWNLOAD_ALL_TASKS and not AVOID_LARGE_DOWNLOADS:
 if ENABLE_ANTAGONIST:
     print("Fetching antagonist output")
     cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.csv {}/".format(config_remote.KEY_LOCATION, 
+          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.log {}/".format(config_remote.KEY_LOCATION, 
                                                                                         config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
