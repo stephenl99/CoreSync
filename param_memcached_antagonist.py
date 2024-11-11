@@ -95,6 +95,7 @@ NUM_CORES_SERVER = int(sys.argv[9])
 NUM_CORES_LC = int(sys.argv[10])
 NUM_CORES_LC_GUARANTEED = int(sys.argv[11])
 NUM_CORES_CLIENT = 16
+NUM_CORES_ANTAGONIST_GUARANTEED = int(sys.argv[32])
 
 CALADAN_THRESHOLD = int(sys.argv[12])
 CALADAN_INTERVAL = int(sys.argv[24])
@@ -133,7 +134,7 @@ utilization_lower = float(sys.argv[21])
 utilization_upper = float(sys.argv[22])
 
 # number of threads for antagonist
-threads = 20
+threads = 18
 # units of work each thread attempts at once
 work_units = 10
 # config string describing what type of antagonist worker, and other variables
@@ -346,7 +347,7 @@ generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
                          latency_critical=True, guaranteed_kthread=NUM_CORES_LC_GUARANTEED)
 generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, False, DISABLE_WATCHDOG,
-                         latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
+                         latency_critical=False, guaranteed_kthread=NUM_CORES_ANTAGONIST_GUARANTEED, antagonist="antagonist.config")
 generate_shenango_config(False, client_conn, client_ip, netmask, gateway,
                          NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 for i in range(NUM_AGENT):
@@ -415,13 +416,6 @@ sleep(1)
 
 for offered_load in OFFERED_LOADS:
 
-    if ENABLE_ANTAGONIST:
-        print("Starting server antagonist")
-        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
-                " {} > antagonist.log 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
-        server_stress_session = execute_remote([server_conn], cmd, False)
-        sleep(1)
-
     print("Load = {:d}".format(offered_load))
     # Start memcached
     print("Starting Memcached server...")
@@ -452,9 +446,7 @@ for offered_load in OFFERED_LOADS:
     print("grab PIDs at server")
     cmd = "cd ~ && echo memcached > PID.txt && pidof memcached >> PID.txt"
     execute_remote([server_conn], cmd, True)
-    if ENABLE_ANTAGONIST:
-        cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
-        execute_remote([server_conn], cmd, True)
+    
     cmd = "cd ~ && echo iokerneld >> PID.txt && pidof iokerneld >> PID.txt"
     execute_remote([server_conn], cmd, True)
     # cmd = "cd ~ && echo stress_shm_query >> PID.txt && pidof stress_shm_query >> PID.txt"
@@ -482,6 +474,17 @@ for offered_load in OFFERED_LOADS:
             " >stdout.out 2>&1".format(config_remote.ARTIFACT_PATH, OVERLOAD_ALG, client_ip)
     client_agent_sessions += execute_remote(agent_conns, cmd, False)
 
+    # moving to after warmup
+    if ENABLE_ANTAGONIST:
+        print("Starting server antagonist")
+        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
+                " {} > antagonist.log 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
+        server_stress_session = execute_remote([server_conn], cmd, False)
+        sleep(1)
+    if ENABLE_ANTAGONIST:
+        cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
+        execute_remote([server_conn], cmd, True)
+    
     # Wait for client and agents
     print("\tWaiting for client and agents...")
     for client_agent_session in client_agent_sessions:
