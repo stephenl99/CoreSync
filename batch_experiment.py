@@ -1320,7 +1320,7 @@ def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
     
     num_cores_server = 18
     num_cores_lc = 18
-    num_cores_lc_guaranteed = 0 # TODO might not be needed
+    num_cores_lc_guaranteed = 18 # TODO might not be needed
     num_cores_antagonist_guaranteed = 0
     core_credit_ratio = 15
 

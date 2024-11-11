@@ -275,10 +275,11 @@ execute_remote([server_conn], cmd, True, False)
 cmd = "sudo killall -9 mcclient"
 execute_remote([client_conn] + agent_conns,
                cmd, True, False)
-cmd = "sudo killall -9 iokerneld && sudo killall -9 stress_shm_query"\
-      " && sudo killall -9 stress"
+cmd = "sudo killall -9 iokerneld"
 execute_remote([server_conn, client_conn] + agent_conns,
                cmd, True, False)
+cmd = "sudo killall -9 stress"
+execute_remote([server_conn], cmd, True, False)
 sleep(1)
 
 # Remove temporary output
