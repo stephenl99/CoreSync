@@ -1315,77 +1315,77 @@ def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
     download_all_tasks = 0
     breakwater_timeseries = 1 # for now, with 4 nodes
     rebuild = 1
-    range_loads = 0
+    range_loads = 1
     antagonist = 1
     
-    num_cores_server = 18
-    num_cores_lc = 18
-    num_cores_lc_guaranteed = 18 # TODO might not be needed
+    num_cores_server = 16 # leaving 1 for the timer
+    num_cores_lc = 16
+    num_cores_lc_guaranteed = 16 # TODO seems to be needed
     num_cores_antagonist_guaranteed = 0
     core_credit_ratio = 15
 
     breakwater_parking = 0
     spin_server = 0
     
-    for temp_load in range(500000, 4000001, 500000): # [500000]:
-        offered_load = temp_load
-        # coresync run
-        breakwater_parking = 1 # enable coresync
-        spin_server = 0
-        
-        for ps in [current_load_factor]: # let's test some parking scales
-            current_load_factor = ps
-            for s in ["ias",]:# "simple"]:
-                caladan_interval = 10
-                caladan_threshold = 10
-                scheduler = s
-                call_experiment()
-        breakwater_parking = 0
-
-        # do utilization range and delay range calls here
-        breakwater_parking = 0
-        scheduler = "range_policy"
-        caladan_interval = 5
-        for range_s in ["utilization", "delay"]:
-            breakwater_parking = 0
-            if range_s == "delay":
-                for d in delay_ranges:
-                    delay_lower = d[0]
-                    delay_upper = d[1]
-                    sched_delay = 1
-                    call_experiment()
-                    sched_delay = 0
-            elif range_s == "utilization":
-                for u in utilization_ranges:
-                    utilization_lower = u[0]
-                    utilization_upper = u[1]
-                    sched_utilization = 1
-                    call_experiment()
-                    sched_utilization = 0
-                    # exit() # temp TODO just want to run the util run
-
-        for s in ["ias", "simple"]:
-            if s == "simple":
-                caladan_interval = 5
-                caladan_threshold = 5
-            else:
-                caladan_interval = 10
-                caladan_threshold = 10
+    # for temp_load in range(500000, 4000001, 500000): # [500000]:
+    # offered_load = temp_load
+    # coresync run
+    breakwater_parking = 1 # enable coresync
+    spin_server = 0
+    
+    for ps in [current_load_factor]: # let's test some parking scales
+        current_load_factor = ps
+        for s in ["ias",]:# "simple"]:
+            caladan_interval = 10
+            caladan_threshold = 10
             scheduler = s
-            call_experiment()
-            # return
-        # spin run
-        antagonist = 0
+            # call_experiment()
+    # return
+    breakwater_parking = 0
+    # do utilization range and delay range calls here
+    breakwater_parking = 0
+    scheduler = "range_policy"
+    caladan_interval = 5
+    for range_s in ["utilization", "delay"]:
         breakwater_parking = 0
-        caladan_interval = 10
-        caladan_threshold = 10
-        spin_server = 1
-        scheduler = "simple"
-        num_cores_lc_guaranteed = 18
+        if range_s == "delay":
+            for d in delay_ranges:
+                delay_lower = d[0]
+                delay_upper = d[1]
+                sched_delay = 1
+                call_experiment()
+                sched_delay = 0
+        elif range_s == "utilization":
+            for u in utilization_ranges:
+                utilization_lower = u[0]
+                utilization_upper = u[1]
+                sched_utilization = 1
+                call_experiment()
+                sched_utilization = 0
+                # exit() # temp TODO just want to run the util run
+
+    for s in ["ias", "simple"]:
+        if s == "simple":
+            caladan_interval = 5
+            caladan_threshold = 5
+        else:
+            caladan_interval = 10
+            caladan_threshold = 10
+        scheduler = s
         call_experiment()
-        spin_server = 0
-        num_cores_lc_guaranteed = 0
-        # exit()
+        # return
+    # spin run
+    antagonist = 0
+    breakwater_parking = 0
+    caladan_interval = 10
+    caladan_threshold = 10
+    spin_server = 1
+    scheduler = "simple"
+    call_experiment()
+    spin_server = 0
+    # num_cores_lc_guaranteed = 0
+    antagonist = 1
+    # exit()
 
 if __name__ == "__main__":
     # sensitivity(arg_service_time=10)

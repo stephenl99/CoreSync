@@ -88,6 +88,7 @@ NUM_CORES_SERVER = int(sys.argv[9])
 NUM_CORES_LC = int(sys.argv[10])
 NUM_CORES_LC_GUARANTEED = int(sys.argv[11])
 NUM_CORES_CLIENT = 16
+NUM_CORES_ANTAGONIST_GUARANTEED = int(sys.argv[32])
 
 CALADAN_THRESHOLD = int(sys.argv[12])
 CALADAN_INTERVAL = int(sys.argv[24])
@@ -108,7 +109,10 @@ else:
         " replace/netbench.cc"
     execute_local(cmd)
 
-ENABLE_ANTAGONIST = True
+ENABLE_ANTAGONIST = int(sys.argv[31])
+print("antagonist is: {}".format(ENABLE_ANTAGONIST))
+ANTAG_SPIN_CORES = 0
+shm_key = 179
 
 IAS_DEBUG = False
 
@@ -125,7 +129,7 @@ utilization_lower = float(sys.argv[21])
 utilization_upper = float(sys.argv[22])
 
 # number of threads for antagonist
-threads = 20
+threads = int(sys.argv[9])
 # units of work each thread attempts at once
 work_units = 10
 # config string describing what type of antagonist worker, and other variables
@@ -209,7 +213,11 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
     if spin:
         config_string += "\nruntime_spinning_kthreads {:d}".format(num_cores)
     else:
-        config_string += "\nruntime_spinning_kthreads 0"
+        if antagonist != "none" and ANTAG_SPIN_CORES > 0:
+            config_string += "\nruntime_spinning_kthreads {}".format(ANTAG_SPIN_CORES)
+            print("yay antag spin cores worked: {}".format(ANTAG_SPIN_CORES))
+        else:
+            config_string += "\nruntime_spinning_kthreads 0"
 
     if directpath:
         config_string += "\nenable_directpath 1"
@@ -229,6 +237,7 @@ print ("number of agents: {:d}".format(NUM_AGENT))
 # configure Shenango IPs for config
 # TODO does each app on shenango need a unique server ip?
 antagonist_ip = "192.168.1.7"
+antagonist_timer_ip = "192.168.1.8"
 server_ip = "192.168.1.200"
 client_ip = "192.168.1.100"
 agent_ips = []
@@ -260,9 +269,11 @@ for agent in config_remote.AGENTS:
 
 # Clean-up environment
 print("Cleaning up machines...")
-cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld && sudo killall -9 stress"
+cmd = "sudo killall -9 netbench & sudo killall -9 iokerneld & sudo killall -9 stress"
 execute_remote([server_conn, client_conn] + agent_conns,
                cmd, True, False)
+cmd = "sudo killall -9 stress_timer"
+execute_remote([server_conn], cmd, True, False)
 sleep(1)
 
 # Remove temporary output
@@ -290,13 +301,14 @@ if REBUILD:
         execute_local(cmd)
 
     # adding to server
-    if IAS_DEBUG:
-        print("Replacing ias.h")
-        # - server
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
-                " {}@{}:~/{}/{}/iokernel/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
+    # if IAS_DEBUG:
+    #     print("Replacing ias.h")
+    #     # - server
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/ias.h"\
+    #             " {}@{}:~/{}/{}/iokernel/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
+    
     # the below if True will replace bw_server.c for me
     if EXTRA_TIMESERIES_DEBUG:
         print("replacing sched.c")
@@ -320,6 +332,22 @@ if REBUILD:
         cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
             " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_remote([server_conn], cmd)
+
+    if ENABLE_ANTAGONIST:
+        # - server
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
+                " {}@{}:~/{}/{}/apps/netbench/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress_timer.cc"\
+                " {}@{}:~/{}/{}/apps/netbench/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/Makefile"\
+                " {}@{}:~/{}/{}/apps/netbench/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+
     
     
 
@@ -330,7 +358,10 @@ generate_shenango_config(True, server_conn, server_ip, netmask, gateway,
                          latency_critical=True, guaranteed_kthread=NUM_CORES_LC_GUARANTEED)
 generate_shenango_config(True, server_conn, antagonist_ip, netmask, gateway,
                          NUM_CORES_SERVER, ENABLE_DIRECTPATH, False, DISABLE_WATCHDOG,
-                         latency_critical=False, guaranteed_kthread=0, antagonist="antagonist.config")
+                         latency_critical=False, guaranteed_kthread=NUM_CORES_ANTAGONIST_GUARANTEED, antagonist="antagonist.config")
+generate_shenango_config(True, server_conn, antagonist_timer_ip, netmask, gateway,
+                         2, ENABLE_DIRECTPATH, True, DISABLE_WATCHDOG,
+                         latency_critical=False, guaranteed_kthread=2, antagonist="antagonist_timer.config")
 generate_shenango_config(False, client_conn, client_ip, netmask, gateway,
                          NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 for i in range(NUM_AGENT):
@@ -353,13 +384,6 @@ if REBUILD:
         cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
             " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
-
-    if ENABLE_ANTAGONIST:
-        # - server
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
-                " {}@{}:~/{}/{}/apps/netbench/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_local(cmd)
 
 # Rebuild Shanango
@@ -409,15 +433,13 @@ for agent_node in agent_conns:
 sleep(1)
 
 for offered_load in OFFERED_LOADS:
-
-    if ENABLE_ANTAGONIST:
-        print("Starting server antagonist")
-        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d}"\
-                " {} > antagonist.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, threads, work_units, antagonist_param)
-        server_stress_session = execute_remote([server_conn], cmd, False)
-        sleep(1)
-
     print("Load = {:d}".format(offered_load))
+    if ENABLE_ANTAGONIST:
+        print("Starting server antagonist timer")
+        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress_timer antagonist_timer.config {:d} {:d}"\
+                " > antagonist.log 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, shm_key, threads)
+        server_stress_timer_session = execute_remote([server_conn], cmd, False)
+        sleep(1)
     # Execute netbench application
     # - server
     print("\tExecuting server...")
@@ -433,9 +455,6 @@ for offered_load in OFFERED_LOADS:
     print("grab PIDs at server")
     cmd = "cd ~ && echo netbench > PID.txt && pidof netbench >> PID.txt"
     execute_remote([server_conn], cmd, True)
-    if ENABLE_ANTAGONIST:
-        cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
-        execute_remote([server_conn], cmd, True)
     cmd = "cd ~ && echo iokerneld >> PID.txt && pidof iokerneld >> PID.txt"
     execute_remote([server_conn], cmd, True)
     # cmd = "cd ~ && echo stress_shm_query >> PID.txt && pidof stress_shm_query >> PID.txt"
@@ -459,7 +478,13 @@ for offered_load in OFFERED_LOADS:
             " {} client.config agent {} {:d} >stdout.out 2>&1"\
             .format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, OVERLOAD_ALG, client_ip, LOADSHIFT)
     client_agent_sessions += execute_remote(agent_conns, cmd, False)
-
+    if ENABLE_ANTAGONIST:
+        print("Starting server antagonist")
+        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d} {:d}"\
+                " {} > antagonist.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, shm_key, threads, work_units, antagonist_param)
+        # print(cmd)
+        server_stress_session = execute_remote([server_conn], cmd, False)
+        sleep(1)
     # Wait for client and agents
     print("\tWaiting for client and agents...")
     for client_agent_session in client_agent_sessions:
@@ -477,7 +502,12 @@ for offered_load in OFFERED_LOADS:
         print("killing server antagonist")
         cmd = "sudo killall -9 stress"
         execute_remote([server_conn], cmd, True, False) # TODO
+        cmd = "sudo killall -9 stress_timer"
+        execute_remote([server_conn], cmd, True, False)
         server_stress_session[0].recv_exit_status()
+        server_stress_timer_session[0].recv_exit_status()
+
+    sleep(1)
     
     if BREAKWATER_TIMESERIES and offered_load in requested_timeseries:
         print("grabbing bw_server timeseries in loop, load:{}".format(offered_load))
@@ -488,11 +518,20 @@ for offered_load in OFFERED_LOADS:
             data = original.read()
         execute_local("rm {}/timeseries.csv".format(run_dir))
         with open("{}/{}k_timeseries.csv".format(run_dir, int(offered_load / 1000)), "w+") as modified:
-            if False:
+            if False: # EXTRA_TIMESERIES_DEBUG
                 modified.write("timestamp,credit_pool,credit_used,num_pending,delay,num_cores,avg_st,successes,total_reductions,credit_reduction,bad_actions\n" + data)
             else:
                 modified.write("timestamp,credit_pool,credit_used,num_pending,num_drained,num_active,num_sess,delay,num_cores,avg_st,successes\n" + data)
-
+    if ENABLE_ANTAGONIST:
+        print("Fetching antagonist output")
+        if not os.path.exists("{}/antagonist".format(run_dir)):
+            os.mkdir("{}/antagonist".format(run_dir))
+        cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.log {}/antagonist/".format(config_remote.KEY_LOCATION, 
+                                                                                            config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
+        execute_local(cmd)
+        cmd = "mv {}/antagonist/antagonist.log {}/antagonist/{}k_antagonist.log".format(run_dir, run_dir, int(offered_load / 1000))
+        execute_local(cmd)
     sleep(1)
 
 # Kill IOKernel
@@ -541,7 +580,7 @@ if ENABLE_ANTAGONIST:
     eric_prefix += "_antagonist"
 output_prefix += "_{:d}cores".format(NUM_CORES_SERVER)
 output_prefix += "_{:d}load".format(OFFERED_LOADS[0])
-# Assuming 16 cores consistently for now, so not adding cores to prefix
+
 if LOADSHIFT:
     eric_prefix += "_loadshift"
 else:
@@ -603,12 +642,6 @@ if DOWNLOAD_ALL_TASKS and not AVOID_LARGE_DOWNLOADS:
                                                                                         config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, run_dir)
     execute_local(cmd)
 
-if ENABLE_ANTAGONIST:
-    print("Fetching antagonist output")
-    cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-          " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.csv {}/".format(config_remote.KEY_LOCATION, 
-                                                                                        config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
-    execute_local(cmd)
 
 # Remove temp outputs
 cmd = "rm output.csv"
@@ -711,10 +744,10 @@ cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
 
 # produce the cores if applicable
-if IAS_DEBUG and not AVOID_LARGE_DOWNLOADS:
-    print("creating cores csv")
-    cmd = "cd {} && python3 ../../../graph_scripts/create_corecsv.py".format(run_dir)
-    execute_local(cmd)
+# if IAS_DEBUG and not AVOID_LARGE_DOWNLOADS:
+#     print("creating cores csv")
+#     cmd = "cd {} && python3 ../../../graph_scripts/create_corecsv.py".format(run_dir)
+#     execute_local(cmd)
 
 if CSV_NAME_DIR:
     os.chdir(output_dir)
