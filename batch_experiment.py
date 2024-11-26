@@ -1317,11 +1317,12 @@ def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
     rebuild = 1
     range_loads = 1
     antagonist = 1
-    
-    num_cores_server = 16 # leaving 1 for the timer
+    # leaving 2 for the timer
+    num_cores_server = 16 # but, they don't leave any for timer with swaptions. Could see how 18 plays out
     num_cores_lc = 16
     num_cores_lc_guaranteed = 16 # TODO seems to be needed
     num_cores_antagonist_guaranteed = 0
+    current_load_factor = 0.075
     core_credit_ratio = 15
 
     breakwater_parking = 0
@@ -1339,7 +1340,7 @@ def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
             caladan_interval = 10
             caladan_threshold = 10
             scheduler = s
-            # call_experiment()
+            call_experiment()
     # return
     breakwater_parking = 0
     # do utilization range and delay range calls here

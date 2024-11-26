@@ -53,6 +53,8 @@ make install
 popd
 
 echo building PARSEC
+echo replacing config
+cp ./replace/gcc-shenango-gc.bldconf ./parsec/config/
 for p in x264 swaptions streamcluster; do
 	parsec/bin/parsecmgmt -a build -p $p -c gcc-shenango
 done

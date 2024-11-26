@@ -10,25 +10,29 @@ def calculate_average(filename):
     
     total = 0
     count = 0
+
+    start = 5
     
     with open(filename, 'r') as file:
         for line in file:
             # Find matching lines
             match = pattern.search(line)
             if match:
+                count += 1
+                if count < start:
+                    continue
                 # Extract the last number after the comma
                 last_number = float(line.strip().split(',')[-1])
                 total += last_number
-                count += 1
                 
-                # Stop after the first 7 entries
-                if count == 7:
+                # Stop after the first 8 entries
+                if count - start >= 8:
                     break
     
     # Calculate and print the average
     if count > 0:
-        average = total / count
-        if count != 7:
+        average = total / 8
+        if count != start + 8:
             print(f"had {count} entries, average: {average:.6f}")
         return average
     else:

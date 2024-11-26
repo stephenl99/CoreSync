@@ -16,6 +16,8 @@ import shutil
 EXTRA_TIMESERIES_DEBUG = True # just using it to replace the files- they aren't actually different
 # except for the fix on negative expected issued
 
+USE_SWAPTIONS = True
+
 MAX_KEY_INDEX = 100000
 POPULATING_LOAD = 200000
 
@@ -148,6 +150,7 @@ antagonist_mem_size = 4090880
 # cacheantagonist:4090880
 # randmem:69:seed
 antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
+antagonist_param = "sqrt"
 
 ############################
 ### End of configuration ###
@@ -226,7 +229,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         else:
             config_string += "\nruntime_spinning_kthreads 0"
 
-    if directpath:
+    if directpath and antagonist != "swaptions.config": # TODO might fix swaptions bug
         config_string += "\nenable_directpath 1"
 
     if disable_watchdog:
@@ -245,6 +248,10 @@ print ("number of agents: {:d}".format(NUM_AGENT))
 # TODO does each app on shenango need a unique server ip?
 antagonist_ip = "192.168.1.7"
 antagonist_timer_ip = "192.168.1.8"
+
+swaptions_ip = "192.168.1.9"
+swaptions_shm_query_ip = "192.168.1.10"
+
 server_ip = "192.168.1.200"
 client_ip = "192.168.1.100"
 agent_ips = []
@@ -289,6 +296,11 @@ cmd = "sudo killall -9 stress"
 execute_remote([server_conn], cmd, True, False)
 cmd = "sudo killall -9 stress_timer"
 execute_remote([server_conn], cmd, True, False)
+cmd = "sudo killall -9 stress_shm_query"
+execute_remote([server_conn], cmd, True, False)
+cmd = "sudo killall -9 swaptions"
+execute_remote([server_conn], cmd, True, False)
+
 sleep(1)
 
 # Remove temporary output
@@ -383,6 +395,10 @@ for i in range(NUM_AGENT):
     generate_shenango_config(False, agent_conns[i], agent_ips[i], netmask,
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
+generate_shenango_config(True, server_conn, swaptions_ip, netmask, gateway,
+                         NUM_CORES_SERVER, ENABLE_DIRECTPATH, False, DISABLE_WATCHDOG,
+                         latency_critical=False, guaranteed_kthread=NUM_CORES_ANTAGONIST_GUARANTEED, antagonist="swaptions.config")
+
 if REBUILD:
 
 # Rebuild Shanango
@@ -464,11 +480,26 @@ for offered_load in OFFERED_LOADS:
     execute_remote([client_conn], cmd, True, False)
 
     if ENABLE_ANTAGONIST:
-        print("Starting server antagonist timer")
-        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress_timer antagonist_timer.config {:d} {:d}"\
-                " > antagonist.log 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, shm_key, threads)
-        server_stress_timer_session = execute_remote([server_conn], cmd, False)
-        sleep(1)
+        if USE_SWAPTIONS:
+            print("Starting swaptions application")
+            cmd = "cd ~/{} && export SHMKEY={:d} &&"\
+                " parsec/pkgs/apps/swaptions/inst/amd64-linux.gcc-shenango-gc/bin/swaptions"\
+                " swaptions.config -ns 5000000 -sm 400 -nt {:d}  > swaptions.out 2> swaptions.err".format(config_remote.ARTIFACT_PATH, shm_key, threads)
+            server_swaptions_session = execute_remote([server_conn], cmd, False)
+            sleep(1)
+            cmd = "cd ~ && echo swaptions >> PID.txt && pidof swaptions >> PID.txt"
+            execute_remote([server_conn], cmd, True)
+            # Start shm query from I guess swaptions?
+            print("Starting shm query swaptions")
+            cmd = "cd ~/{} && export SHMKEY={:d} && sudo ./caladan/apps/netbench/stress_shm_query"\
+                " {:d}:{:d}:{:d}  > swaptions_shm_query.out 2>&1".format(config_remote.ARTIFACT_PATH, shm_key, shm_key, 1000, threads)
+            server_shmquerySWAPTIONS_session = execute_remote([server_conn], cmd, False)
+        else:
+            print("Starting server antagonist timer")
+            cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress_timer antagonist_timer.config {:d} {:d}"\
+                    " > antagonist.log 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, shm_key, threads)
+            server_stress_timer_session = execute_remote([server_conn], cmd, False)
+            sleep(1)
     # getting PIDs
     # server netbench stress_shm_query swaptions iokerneld
     print("grab PIDs at server")
@@ -504,15 +535,20 @@ for offered_load in OFFERED_LOADS:
 
     # moving to after warmup
     if ENABLE_ANTAGONIST:
-        print("Starting server antagonist")
-        cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d} {:d}"\
-                " {} > antagonist.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, shm_key, threads, work_units, antagonist_param)
-        # print(cmd)
-        server_stress_session = execute_remote([server_conn], cmd, False)
-        sleep(1)
-    if ENABLE_ANTAGONIST:
-        cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
-        execute_remote([server_conn], cmd, True)
+        if USE_SWAPTIONS:
+            # I think the swaptions implementation has the swaptions create the shm,
+            # not the query. So they must start together
+            pass
+        else:
+            print("Starting server antagonist")
+            cmd = "cd ~/{} && sudo ./{}/apps/netbench/stress antagonist.config {:d} {:d} {:d}"\
+                    " {} > antagonist.out 2>&1".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME, shm_key, threads, work_units, antagonist_param)
+            # print(cmd)
+            server_stress_session = execute_remote([server_conn], cmd, False)
+            sleep(1)
+            cmd = "cd ~ && echo antagonist >> PID.txt && pidof stress >> PID.txt"
+            execute_remote([server_conn], cmd, True)
+        
     
     # Wait for client and agents
     print("\tWaiting for client and agents...")
@@ -534,14 +570,26 @@ for offered_load in OFFERED_LOADS:
     # server_shmqueryBW_session[0].recv_exit_status()
     # server_shmquerySWAPTIONS_session[0].recv_exit_status()
     if ENABLE_ANTAGONIST:
+        if USE_SWAPTIONS:
+            print("killing stress shm queries")
+            cmd = "sudo killall -9 stress_shm_query"
+            execute_remote([server_conn], cmd, True, False)
+            server_shmquerySWAPTIONS_session[0].recv_exit_status()
+
+            # kill swaptions
+            print("killing swaptions")
+            cmd = "sudo killall -9 swaptions"
+            execute_remote([server_conn], cmd, True, False)
+            server_swaptions_session[0].recv_exit_status()
+        else:
         # kill antagonist
-        print("killing server antagonist")
-        cmd = "sudo killall -9 stress"
-        execute_remote([server_conn], cmd, True, False) # TODO
-        cmd = "sudo killall -9 stress_timer"
-        execute_remote([server_conn], cmd, True, False)
-        server_stress_session[0].recv_exit_status()
-        server_stress_timer_session[0].recv_exit_status()
+            print("killing server antagonist")
+            cmd = "sudo killall -9 stress"
+            execute_remote([server_conn], cmd, True, False) # TODO
+            cmd = "sudo killall -9 stress_timer"
+            execute_remote([server_conn], cmd, True, False)
+            server_stress_session[0].recv_exit_status()
+            server_stress_timer_session[0].recv_exit_status()
 
     sleep(1)
     
@@ -562,11 +610,12 @@ for offered_load in OFFERED_LOADS:
         print("Fetching antagonist output")
         if not os.path.exists("{}/antagonist".format(run_dir)):
             os.mkdir("{}/antagonist".format(run_dir))
+        antag_output_name = "swaptions_shm_query.out" if USE_SWAPTIONS else "antagonist.log"
         cmd = "rsync -azh --info=progress2 -e \"ssh -i {} -o StrictHostKeyChecking=no -o"\
-            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/antagonist.log {}/antagonist/".format(config_remote.KEY_LOCATION, 
-                                                                                            config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, run_dir)
+            " UserKnownHostsFile=/dev/null\" {}@{}:~/{}/{} {}/antagonist/".format(config_remote.KEY_LOCATION, 
+                                                            config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, antag_output_name, run_dir)
         execute_local(cmd)
-        cmd = "mv {}/antagonist/antagonist.log {}/antagonist/{}k_antagonist.log".format(run_dir, run_dir, int(offered_load / 1000))
+        cmd = "mv {}/antagonist/{} {}/antagonist/{}k_antagonist.log".format(run_dir, antag_output_name, run_dir, int(offered_load / 1000))
         execute_local(cmd)
     sleep(1)
 
