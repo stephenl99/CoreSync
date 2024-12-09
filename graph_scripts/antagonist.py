@@ -4,6 +4,28 @@ import shutil
 import re
 import csv
 
+swaptions = True
+swaptions_start = 4.5
+swaptions_end = 4.5 + 8
+
+def calculate_average_swaptions(filename):
+    count = 0
+    with open(filename, 'r') as file:
+        for line in file:
+            if "detected" in line:
+                continue
+            splits = line.split()
+            curr_time = splits[1]
+            curr_time = float(curr_time[:-1])
+            if curr_time < swaptions_start:
+                continue
+            if curr_time > swaptions_end:
+                break
+            # print(splits[-2])
+            count += int(splits[-2])
+    return count / (swaptions_end - swaptions_start) # give per second rate
+
+
 def calculate_average(filename):
     # Regular expression to match the lines of interest
     pattern = re.compile(r"\[\s*\d+\.\d+\] CPU \d+\| <\d> \d+\.\d+,\d+\.\d+")
@@ -54,7 +76,10 @@ for current_dir in os.listdir():
     values = []
     for f in os.listdir():
         load = int(f.split("k")[0])
-        avg = calculate_average(f)
+        if swaptions:
+            avg = calculate_average_swaptions(f)
+        else:
+            avg = calculate_average(f)
         values.append([load, avg])
     
     filename = "../antagonist_data.csv"

@@ -488,7 +488,8 @@ def baselines():
                 call_experiment()
         else:
             call_experiment()
-    
+
+#### good to use this one 
 def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
     global algorithm
     global connections
@@ -1249,6 +1250,7 @@ def test_memcached():
 
     call_experiment()
 
+#### good to use this one
 def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
     global algorithm
     global connections
@@ -1318,12 +1320,13 @@ def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
     range_loads = 1
     antagonist = 1
     # leaving 2 for the timer
-    num_cores_server = 16 # but, they don't leave any for timer with swaptions. Could see how 18 plays out
-    num_cores_lc = 16
-    num_cores_lc_guaranteed = 16 # TODO seems to be needed
+    num_cores_server = 18 # but, they don't leave any for timer with swaptions. Could see how 18 plays out
+    num_cores_lc = 18
+    num_cores_lc_guaranteed = 18 # TODO seems to be needed
     num_cores_antagonist_guaranteed = 0
     current_load_factor = 0.075
     core_credit_ratio = 15
+    algorithm = "nocontrol"
 
     breakwater_parking = 0
     spin_server = 0
@@ -1364,7 +1367,7 @@ def testing_antagonist_nov2024(arg_service_time=10, memcached_target=25):
                 call_experiment()
                 sched_utilization = 0
                 # exit() # temp TODO just want to run the util run
-
+    # return
     for s in ["ias", "simple"]:
         if s == "simple":
             caladan_interval = 5

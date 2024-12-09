@@ -47,6 +47,8 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
 execute_local(cmd)
 
 BREAKWATER_TIMESERIES = int(sys.argv[28])
+if OVERLOAD_ALG != "breakwater":
+    BREAKWATER_TIMESERIES = 0
 if ST_AVG == 10:
     # requested_timeseries = [600000, 700000]
     requested_timeseries = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
@@ -371,6 +373,10 @@ if REBUILD:
                 .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_local(cmd)
         cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/Makefile"\
+                " {}@{}:~/{}/{}/apps/netbench/"\
+                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+        execute_local(cmd)
+        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress_shm_query.cc"\
                 " {}@{}:~/{}/{}/apps/netbench/"\
                 .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_local(cmd)
