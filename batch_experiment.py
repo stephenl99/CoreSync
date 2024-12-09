@@ -598,10 +598,17 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
                 sched_delay = 0
         elif range_s == "utilization":
             for u in utilization_ranges:
+                breakwater_parking = 1
                 utilization_lower = u[0]
                 utilization_upper = u[1]
                 sched_utilization = 1
-                call_experiment()
+                call_experiment() # utilization range with coresync run
+                sched_utilization = 0
+                breakwater_parking = 0
+                utilization_lower = u[0]
+                utilization_upper = u[1]
+                sched_utilization = 1
+                call_experiment() # normal run
                 sched_utilization = 0
                 # exit() # temp TODO just want to run the util run
 
@@ -615,7 +622,7 @@ def figure_1_4_5_6_7_11(arg_service_time=10, memcached_target=25):
             caladan_threshold = 10
         scheduler = s
         call_experiment()
-    return
+    # return
     # spin run
     caladan_interval = 10
     caladan_threshold = 10
@@ -863,263 +870,6 @@ def repeats(count, arg_service_time=10, memcached_target=25):
     call_experiment()
     spin_server = 0
     num_cores_lc_guaranteed = 0
-    
-def misc_runs():
-    global algorithm
-    global connections
-    global service_time
-    global breakwater_target
-    global service_distribution
-    global offered_load
-    global loadshift
-    global spin_server
-    global num_cores_server
-    global num_cores_lc
-    global num_cores_lc_guaranteed
-    global caladan_threshold
-    global slo
-    global scheduler
-    global delay_ranges
-    global utilization_ranges
-    global caladan_interval
-    global delay_lower
-    global delay_upper
-    global utilization_lower
-    global utilization_upper
-    global sched_delay
-    global sched_utilization
-    global current_load_factor
-    global breakwater_parking
-    global core_credit_ratio
-
-    global range_loads
-
-
-    # trying to do 1 us service times. Make sure to change service time in this file, and change the range loads
-    # and also change the range loads so we grab the right timeseries
-    # range_loads = 1
-    # breakwater_parking = 0
-    # spin_server = 1
-    # num_cores_lc_guaranteed = 16
-    # scheduler = "simple"
-    # call_experiment()
-    # num_cores_lc_guaranteed = 0
-    # spin_server = 0
-    # for s in ["ias", "simple", "range_policy"]:
-    #     scheduler = s
-    #     if s == "range_policy":
-    #         sched_utilization = 1
-    #         call_experiment()
-    #         sched_utilization = 0
-    #     else:
-    #         call_experiment()
-
-    # TODO maybe re run these, and grab EVERY timeseries just for records sake.
-    # MAKE SURE to set rebuild to true in the param file for the first run at least.
-    # quick range loads for just ias and simple parking
-
-
-    # range of loads runs while varying the parking scale
-    # breakwater_parking = 1
-    # for s in schedulers:
-    #     scheduler = s
-    #     if s == "range_policy":
-    #         caladan_interval = 5
-    #         for range_s in ["utilization"]:
-    #             breakwater_parking = 0
-    #             if range_s == "delay":
-    #                 for d in delay_ranges:
-    #                     delay_lower = d[0]
-    #                     delay_upper = d[1]
-    #                     sched_delay = 1
-    #                     call_experiment()
-    #                     sched_delay = 0
-    #             elif range_s == "utilization":
-    #                 for u in utilization_ranges:
-    #                     utilization_lower = u[0]
-    #                     utilization_upper = u[1]
-    #                     sched_utilization = 1
-    #                     call_experiment()
-    #                     sched_utilization = 0
-    #             breakwater_parking = 1
-    #         caladan_interval = 10
-    #     elif s == "spin":
-    #         scheduler = "simple"
-    #         spin_server = 1
-    #         num_cores_lc_guaranteed = 16
-    #         breakwater_parking = 0
-    #         call_experiment()
-    #         spin_server = 0
-    #         num_cores_lc_guaranteed = 0
-    #         breakwater_parking = 1
-    #     else:    
-    #         for lf in load_factors:
-    #             current_load_factor = lf
-    #             call_experiment()
-    #         breakwater_parking = 0
-    #         call_experiment() # to get baseline for simple and ias too
-    #         breakwater_parking = 1
-
-
-    # single loads, while varying parking scale
-    # breakwater_parking = 1
-    # for s in schedulers:
-    #     scheduler = s
-    #     for l in loads:
-    #         offered_load = l
-    #         if s == "range_policy":
-    #             caladan_interval = 5
-    #             for range_s in ["utilization"]:
-    #                 breakwater_parking = 0
-    #                 if range_s == "delay":
-    #                     for d in delay_ranges:
-    #                         delay_lower = d[0]
-    #                         delay_upper = d[1]
-    #                         sched_delay = 1
-    #                         call_experiment()
-    #                         sched_delay = 0
-    #                 elif range_s == "utilization":
-    #                     for u in utilization_ranges:
-    #                         utilization_lower = u[0]
-    #                         utilization_upper = u[1]
-    #                         sched_utilization = 1
-    #                         call_experiment()
-    #                         sched_utilization = 0
-    #                 breakwater_parking = 1
-    #             caladan_interval = 10
-    #         elif s == "spin":
-    #             scheduler = "simple"
-    #             spin_server = 1
-    #             num_cores_lc_guaranteed = 16
-    #             breakwater_parking = 0
-    #             call_experiment()
-    #             spin_server = 0
-    #             num_cores_lc_guaranteed = 0
-    #             breakwater_parking = 1
-    #         else:    
-    #             for lf in load_factors:
-    #                 current_load_factor = lf
-    #                 call_experiment()
-    #             breakwater_parking = 0
-    #             call_experiment() # to get baseline for simple and ias too
-    #             breakwater_parking = 1
-
-    # for s in schedulers:
-    #     scheduler = s
-    #     for l in loads:
-    #         offered_load = l
-    #         if s == "spin":
-    #             scheduler = "simple"
-    #             spin_server = 1
-    #             num_cores_lc_guaranteed = 16
-    #             breakwater_parking = 0
-    #             call_experiment()
-    #             spin_server = 0
-    #             num_cores_lc_guaranteed = 0
-    #             breakwater_parking = 1
-    #         else:    
-    #             for lf in load_factors:
-    #                 current_load_factor = lf
-    #                 call_experiment()
-                
-                    
-
-    # for s in ["spinning", "simple", "ias", "range_policy"]:
-    #     scheduler = s
-    #     for lf in load_factors:
-    #         current_load_factor = lf
-    #         # if s == "spinning" and (lf == 1.0 or lf == 1.1 or lf == 1.2):
-    #         #     continue
-    #         if s == "spinning":
-    #             scheduler = "simple"
-    #             spin_server = 1
-    #             num_cores_lc_guaranteed = num_cores_lc
-    #             sched_utilization = 0
-    #         elif s == "range_policy":
-    #             spin_server = 0
-    #             num_cores_lc_guaranteed = 0
-    #             sched_utilization = 1
-    #         else:
-    #             spin_server = 0
-    #             num_cores_lc_guaranteed = 0
-    #             sched_utilization = 0
-    #         call_experiment()
-
-    # for a in algorithms:
-    #     algorithm = a
-    #     for c in conns:
-    #         connections = c
-    #         for l in load_factors:
-    #             current_load_factor = l
-    #             # offered_load = l, for l in loads
-    #             for i in range(2):
-    #                 if i == 0:
-    #                     spin_server = 0
-    #                     num_cores_lc_guaranteed = 0
-    #                 else:
-    #                     spin_server = 1
-    #                     num_cores_lc_guaranteed = num_cores_lc
-    #                 if algorithm != "breakwater":
-    #                     if not spin_server:
-    #                         for s in schedulers:
-    #                             scheduler = s
-    #                             if s == "range_policy":
-    #                                 caladan_interval = 5
-    #                                 for range_s in ["utilization", "delay"]:
-    #                                     if range_s == "delay":
-    #                                         for d in delay_ranges:
-    #                                             delay_lower = d[0]
-    #                                             delay_upper = d[1]
-    #                                             sched_delay = 1
-    #                                             call_experiment()
-    #                                             sched_delay = 0
-    #                                     elif range_s == "utilization":
-    #                                         for u in utilization_ranges:
-    #                                             utilization_lower = u[0]
-    #                                             utilization_upper = u[1]
-    #                                             sched_utilization = 1
-    #                                             call_experiment()
-    #                                             sched_utilization = 0
-    #                             else:
-    #                                 # should call ias and simple
-    #                                 caladan_interval = 10
-    #                                 call_experiment()
-    #                     else:
-    #                         scheduler = "simple"
-    #                         call_experiment()
-    #                     continue
-    #                 for t in breakwater_targets:
-    #                     breakwater_target = t
-    #                     # call_experiment()
-    #                     if not spin_server:
-    #                         for s in schedulers:
-    #                             scheduler = s
-    #                             if s == "range_policy":
-    #                                 caladan_interval = 5
-    #                                 for range_s in ["utilization", "delay"]:
-    #                                     if range_s == "delay":
-    #                                         for d in delay_ranges:
-    #                                             delay_lower = d[0]
-    #                                             delay_upper = d[1]
-    #                                             sched_delay = 1
-    #                                             call_experiment()
-    #                                             sched_delay = 0
-    #                                     elif range_s == "utilization":
-    #                                         for u in utilization_ranges:
-    #                                             utilization_lower = u[0]
-    #                                             utilization_upper = u[1]
-    #                                             sched_utilization = 1
-    #                                             call_experiment()
-    #                                             sched_utilization = 0
-    #                             else:
-    #                                 caladan_interval = 10
-    #                                 call_experiment()
-    #                     else:
-    #                         if l != load_factors[0]:
-    #                             continue
-    #                         caladan_interval = 10
-    #                         scheduler = "simple"
-    #                         call_experiment()
 
 def shenango_misbehave():
     global algorithm
@@ -1395,4 +1145,5 @@ if __name__ == "__main__":
     # sensitivity(arg_service_time=10)
     # for temp_service_time in [1]:
     #     figure_1_4_5_6_7_11(arg_service_time=temp_service_time)
-    testing_antagonist_nov2024(arg_service_time=0, memcached_target=25)
+    # testing_antagonist_nov2024(arg_service_time=0, memcached_target=25)
+    figure_1_4_5_6_7_11(arg_service_time=10)

@@ -490,6 +490,11 @@ park:
 		// && atomic_read(&runningks) == maxks && current_C_issued < (cfg_CORE_CREDIT_RATIO * maxks)
 		if (!notified_breakwater && current_C_issued < (cfg_CORE_CREDIT_RATIO * atomic_read(&runningks))) {
 			// overloaded and at max cores: we should not be parking or reducing credits
+			if (cfg_yield_requests_enabled && return_to_after_yield) {
+				return_to_after_yield = false;
+				iters++; // shouldn't happen unless a yield request sent us here
+				goto after_yield_requested;
+			}
 			goto again;
 		}
 		if (notified_breakwater && (old_C_issued - current_C_issued >= issued_reduction_target)) {
@@ -509,7 +514,11 @@ park:
 				issued_reduction_target = MIN(breakwater_park_target, old_C_issued);
 				notified_breakwater = true;
 			}
-			// iters++; // shouldn't happen unless a yield request sent us here
+			if (cfg_yield_requests_enabled && return_to_after_yield) {
+				return_to_after_yield = false;
+				iters++; // shouldn't happen unless a yield request sent us here
+				goto after_yield_requested;
+			}
 			goto again;
 		}
 	}
