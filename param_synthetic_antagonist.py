@@ -40,6 +40,8 @@ cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\
 execute_local(cmd)
 
 BREAKWATER_TIMESERIES = int(sys.argv[28])
+if OVERLOAD_ALG != "breakwater":
+    BREAKWATER_TIMESERIES = 0
 if ST_AVG == 10:
     # requested_timeseries = [600000, 700000]
     requested_timeseries = [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000, 1100000, 1200000, 1300000, 1400000, 1600000, 2000000, 3000000]
@@ -100,14 +102,6 @@ CORE_CREDIT_RATIO = int(sys.argv[26])
 AVOID_LARGE_DOWNLOADS = int(sys.argv[14])
 
 DOWNLOAD_ALL_TASKS = int(sys.argv[27])
-if DOWNLOAD_ALL_TASKS:
-    cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
-        " replace/netbench.cc"
-    execute_local(cmd)
-else:
-    cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t false/g\'"\
-        " replace/netbench.cc"
-    execute_local(cmd)
 
 ENABLE_ANTAGONIST = int(sys.argv[31])
 print("antagonist is: {}".format(ENABLE_ANTAGONIST))
@@ -141,6 +135,7 @@ antagonist_mem_size = 4090880
 # cacheantagonist:4090880
 # randmem:69:seed
 antagonist_param = "randmem:{:d}:{:d}".format(antagonist_mem_size, random_seed)
+# antagonist_param = "sqrt"
 
 ############################
 ### End of configuration ###
@@ -219,7 +214,7 @@ def generate_shenango_config(is_server ,conn, ip, netmask, gateway, num_cores,
         else:
             config_string += "\nruntime_spinning_kthreads 0"
 
-    if directpath:
+    if directpath and antagonist != "swaptions.config": # TODO might fix swaptions bug
         config_string += "\nenable_directpath 1"
 
     if disable_watchdog:
@@ -310,19 +305,19 @@ if REBUILD:
     #     execute_local(cmd)
     
     # the below if True will replace bw_server.c for me
-    if EXTRA_TIMESERIES_DEBUG:
-        print("replacing sched.c")
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/sched.c"\
-                " {}@{}:~/{}/{}/runtime/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
+    # if EXTRA_TIMESERIES_DEBUG:
+    #     print("replacing sched.c")
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/sched.c"\
+    #             " {}@{}:~/{}/{}/runtime/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
 
-    if True: # TODO either make it an option or something, don't want to always do this. Probably just write it to actual repo
-        print("replacing bw_server.c")
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/bw_server.c"\
-                " {}@{}:~/{}/{}/breakwater/src/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
+    # if True: # TODO either make it an option or something, don't want to always do this. Probably just write it to actual repo
+    #     print("replacing bw_server.c")
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/bw_server.c"\
+    #             " {}@{}:~/{}/{}/breakwater/src/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
 
     if BREAKWATER_TIMESERIES:
         cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t true/\'"\
@@ -332,21 +327,36 @@ if REBUILD:
         cmd = "cd ~/{}/{}/breakwater && sed -i \'s/#define SBW_TS_OUT.*/#define SBW_TS_OUT\\t\\t\\t false/\'"\
             " src/bw_server.c".format(config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
         execute_remote([server_conn], cmd)
+    
+    if DOWNLOAD_ALL_TASKS:
+        cmd = "cd ~/{}/{}/breakwater/apps/netbench/ &&"\
+              " sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
+              " netbench.cc"
+        execute_remote(cmd)
+    else:
+        cmd = "cd ~/{}/{}/breakwater/apps/netbench/ &&"\
+              " sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t false/g\'"\
+              " netbench.cc"
+        execute_remote(cmd)
 
-    if ENABLE_ANTAGONIST:
-        # - server
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
-                " {}@{}:~/{}/{}/apps/netbench/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress_timer.cc"\
-                " {}@{}:~/{}/{}/apps/netbench/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/Makefile"\
-                " {}@{}:~/{}/{}/apps/netbench/"\
-                .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
+    # if ENABLE_ANTAGONIST:
+    #     # - server
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress.cc"\
+    #             " {}@{}:~/{}/{}/apps/netbench/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress_timer.cc"\
+    #             " {}@{}:~/{}/{}/apps/netbench/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/Makefile"\
+    #             " {}@{}:~/{}/{}/apps/netbench/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/stress_shm_query.cc"\
+    #             " {}@{}:~/{}/{}/apps/netbench/"\
+    #             .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
 
     
     
@@ -370,21 +380,21 @@ for i in range(NUM_AGENT):
 
 if REBUILD:
     # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_local(cmd)
-    # - client
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-    execute_local(cmd)
-    # - agents
-    for agent in config_remote.AGENTS:
-        cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
-            " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
-            .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
-        execute_local(cmd)
+    # cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+    #         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+    #         .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.SERVERS[0], config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    # execute_local(cmd)
+    # # - client
+    # cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+    #         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+    #         .format(config_remote.KEY_LOCATION, config_remote.USERNAME, config_remote.CLIENT, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    # execute_local(cmd)
+    # # - agents
+    # for agent in config_remote.AGENTS:
+    #     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no replace/netbench.cc"\
+    #         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
+    #         .format(config_remote.KEY_LOCATION, config_remote.USERNAME, agent, config_remote.ARTIFACT_PATH, config_remote.KERNEL_NAME)
+    #     execute_local(cmd)
 
 # Rebuild Shanango
     print("Building Shenango/Caladan...")

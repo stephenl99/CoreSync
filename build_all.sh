@@ -54,7 +54,7 @@ popd
 
 echo building PARSEC
 echo replacing config
-cp ./replace/gcc-shenango-gc.bldconf ./parsec/config/
+cp ./replace/gcc-shenango-gc.bldconf ./parsec/config/ # no real need to modify the parsec repo
 for p in x264 swaptions streamcluster; do
 	parsec/bin/parsecmgmt -a build -p $p -c gcc-shenango
 done
