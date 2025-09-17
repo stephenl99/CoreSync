@@ -25,7 +25,7 @@ This repository includes the code for [CoreSync (ICNP '25)](https://saeed.github
    * Update `USERNAME` with the one that has access to all the nodes
    * Update `KEY_LOCATION` with the path to the private key `~/.ssh/id_rsa`
 6. Install the required dependencies and scripts on all the nodes (from node-1)
-   * `./setup_remote_caladan.py`
+   * `./setup_remote_caladan.py` (This step takes a lot of time)
 7. Run the tests (from node-1)
    * `./run_synthetic.py`
 
@@ -52,3 +52,10 @@ the core allocator and the overload controller need to set `coresync_r` Caladan 
 to the desired *CoreSync parameter R (i.e., the proportionality parameter)*. This option instructs
 the Caladan runtime to enable CoreSync for that specific application, with the provided
 proportionality parameter.
+
+## CoreSync source
+
+The CoreSync-specific logic is mainly present in the Caladan's runtime scheduler. The changes
+introduced by CoreSync are placed in the `replace` directory. Specifically, the coordination
+algorithm discussed in the paper can be found in `replace/sched.c` which has the code
+for user thread scheduling in Caladan.

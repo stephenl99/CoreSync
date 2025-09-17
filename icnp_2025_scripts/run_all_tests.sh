@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# OUTPUT_DIR="/path/to/your/output/directory"
-OUTPUT_DIR="/proj/cc-profiler-PG0/users/bpardeshi3/understanding_before_icnp/"
-
+OUTPUT_DIR="/path/to/your/output/directory"
 
 echo "####################################################"
 echo "        Running Section 4-B (exponential 10us) Tests"
