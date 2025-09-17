@@ -17,13 +17,23 @@
 
 #include "defs.h"
 
-// TODO this seems unsafe
-// #include <bw_server.h>
 /* global credit pool */
 atomic_t srpc_credit_pool;
 
 /* global credit used */
 atomic_t srpc_credit_used;
+
+atomic_t srpc_num_sess;
+
+atomic_t srpc_num_drained;
+
+atomic_t is_coresync_parking_a_core;
+
+atomic_t last_park_time;
+
+atomic_t last_credit_mod_time;
+
+atomic_t last_credit_mod_value;
 
 /* the current running thread, or NULL if there isn't one */
 __thread thread_t *__self;
@@ -50,10 +60,12 @@ static __thread uint64_t last_watchdog_tsc;
 
 /* whether yield requests are enabled or not */
 bool cfg_yield_requests_enabled;
-bool cfg_breakwater_prevent_parks = false;
-float cfg_SBW_CORE_PARK_TARGET = 1.0;
-// uint64_t to match the return type of runtime_queue_us()
-long cfg_CORE_CREDIT_RATIO = 0;
+
+/*
+ * Coresync config default settings
+ */
+bool cfg_coresync_enable = false;
+long cfg_coresync_R = 0;
 
 /**
  * In inc/runtime/thread.h, this function is declared inline (rather than static
@@ -361,13 +373,9 @@ static __noreturn __noinline void schedule(void)
 	int i, sibling;
 	bool return_to_after_yield = false;
 
-	// caladan-overload-control changes
-	// in bw_server.c, the values are atomic_t, aka volatile int
-	int old_C_issued;
-	int current_C_issued;
-	int breakwater_park_target;
-	int issued_reduction_target;
-	bool notified_breakwater = false;
+    /* Coresync-specific state */
+	int credit_reduction = 0;
+	bool has_core_started_parking = false;
 
 	assert_spin_lock_held(&l->lock);
 	assert(l->parked == false);
@@ -483,46 +491,78 @@ again:
 		}
 	}
 park:
-	// caladan-overload-control
-	// read current outstanding credits
-	if (cfg_breakwater_prevent_parks) {
-		current_C_issued = atomic_read(&srpc_credit_used);
-		// && atomic_read(&runningks) == maxks && current_C_issued < (cfg_CORE_CREDIT_RATIO * maxks)
-		if (!notified_breakwater && current_C_issued < (cfg_CORE_CREDIT_RATIO * atomic_read(&runningks))) {
-			// overloaded and at max cores: we should not be parking or reducing credits
-			if (cfg_yield_requests_enabled && return_to_after_yield) {
-				return_to_after_yield = false;
-				iters++; // shouldn't happen unless a yield request sent us here
-				goto after_yield_requested;
-			}
+
+    /*
+     * If CoreSync is enabled, then we need to check if we need to reduce the
+     * admitted load before parking the core.
+     */
+	if (cfg_coresync_enable) {
+
+        /*
+         * If drained RPC client sessions exist, then we are definitely
+         * overloaded. We do not park the core in this case.
+         */
+		if (atomic_read(&srpc_num_drained)) {
+			credit_reduction = 0;
 			goto again;
 		}
-		if (notified_breakwater && (old_C_issued - current_C_issued >= issued_reduction_target)) {
-			// allow park
-			notified_breakwater = false;
-			// log_info()
+
+		int credit_pool = atomic_read(&srpc_credit_pool);
+		int credit_used = atomic_read(&srpc_credit_used);
+		int num_sess = atomic_read(&srpc_num_sess);
+        int num_cores = atomic_read(&runningks);
+
+        /*
+         * If this core has already signalled breakwater (and has hence started
+         * parking) to reduce the issued credits proportionally, then just verify
+         * if the issued credit reduction has taken place.
+         */
+		if (has_core_started_parking) {
+            /* Verify if paritial proportionality is maintained. */
+			if (((credit_used - num_sess) > cfg_coresync_R * num_cores) &&
+				(credit_pool > credit_used)) {
+                /* If not, do not park the core. */
+				goto again;
+			}
+            /*
+             * Breakwater has reduced the credits proportionally, we can now
+             * park the core.
+             */
+			has_core_started_parking = false;
+			atomic_write(&is_coresync_parking_a_core, 0);
+			goto park_final;
 		}
-		else {
-			if (!notified_breakwater) {
-				int credit_pool = atomic_read(&srpc_credit_pool);
-				// this minimum for credits (max cores) is used throughout breakwater implementation
-				int new_credit_pool = (int) (credit_pool - (cfg_SBW_CORE_PARK_TARGET * (credit_pool / runtime_active_cores())));
-				new_credit_pool = MAX(runtime_max_cores(), new_credit_pool);
-				old_C_issued = atomic_read(&srpc_credit_used);
-				atomic_write(&srpc_credit_pool, new_credit_pool);
-				breakwater_park_target = credit_pool - new_credit_pool;
-				issued_reduction_target = MIN(breakwater_park_target, old_C_issued);
-				notified_breakwater = true;
-			}
-			if (cfg_yield_requests_enabled && return_to_after_yield) {
-				return_to_after_yield = false;
-				iters++; // shouldn't happen unless a yield request sent us here
-				goto after_yield_requested;
-			}
+
+        /* CoreSync allows only one core to park at a time. */
+		if(!atomic_cmpxchg(&is_coresync_parking_a_core, 0, 1)) {
 			goto again;
+		}
+
+        /* If partial proportionality is violated. */
+		if (((credit_used - num_sess) > cfg_coresync_R * num_cores) &&
+            (credit_pool > credit_used)) {
+
+            /*
+             * Reduce the credit pool proportionally. This will cause breakwater
+             * to revoke the issued credits as well.
+             */
+            credit_reduction = (credit_used - num_sess) / num_cores;
+			atomic_sub_and_fetch(&srpc_credit_pool, credit_reduction);
+			has_core_started_parking = true;
+
+            /*
+             * Do not park the core till the issued credits are also reduced
+             * proportionally.
+             */
+			goto again;
+		} else {
+            /* It is safe to park the core */
+			credit_reduction = 0;
+			atomic_write(&is_coresync_parking_a_core, 0);
 		}
 	}
-	
+
+park_final:
 
 	l->parked = true;
 	spin_unlock(&l->lock);
@@ -539,6 +579,15 @@ park:
 	spin_lock(&l->lock);
 	l->parked = false;
 
+    /*
+     * When the core is re-allocated, make sure to return the credits that were
+     * deducted when the core was previously parked.
+     */
+	if (cfg_coresync_enable) {
+		atomic_fetch_and_add(&srpc_credit_pool, credit_reduction);
+		credit_reduction = 0;
+	}
+
 	if (cfg_yield_requests_enabled && return_to_after_yield) {
 		return_to_after_yield = false;
 		goto after_yield_requested;
@@ -547,13 +596,14 @@ park:
 
 done:
 
-	// caladan-overload-control
-	if (cfg_breakwater_prevent_parks && notified_breakwater) {
-		// we found work, restore credits to breakwater
-		// breakwater technically has a max pool size: credit_pool = MIN(credit_pool, num_sess << SBW_MAX_WINDOW_EXP aka 6);
-		// this is unlikely to be hit though. And will be fixed by breakwater quickly if needed.
-		atomic_fetch_and_add(&srpc_credit_pool, breakwater_park_target);
-		notified_breakwater = false;
+    /*
+     * If we find work while CoreSync was parking this core, then we simply
+     * reset the state.
+     */
+	if (cfg_coresync_enable && has_core_started_parking) {
+		atomic_fetch_and_add(&srpc_credit_pool, credit_reduction);
+		has_core_started_parking = false;
+		atomic_write(&is_coresync_parking_a_core, 0);
 	}
 
 	/* pop off a thread and run it */
@@ -1128,6 +1178,10 @@ int sched_init_thread(void)
 int sched_init(void)
 {
 	int ret, i, j, siblings;
+
+	atomic_write(&is_coresync_parking_a_core, 0);
+	atomic_write(&last_credit_mod_time, 0);
+	atomic_write(&last_credit_mod_value, 0);
 
 	/*
 	 * set up allocation routines for threads

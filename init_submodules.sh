@@ -2,10 +2,6 @@
 
 set -e
 
-# Initialize submodules
-# git submodule init
-# git submodule update --init
-
 # Cloudlab patches to Shenango
 echo Applying patch to Shenango
 cd caladan

@@ -13,6 +13,9 @@ extern "C" {
 #include <chrono>
 #include <iostream>
 #include <iomanip>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
 
 barrier_t barrier;
 
@@ -20,81 +23,54 @@ bool synth_barrier_wait() { return barrier_wait(&barrier); }
 
 namespace {
 
+std::string mode;
 int SHM_KEY;
 int threads;
 uint64_t n;
 std::string worker_spec;
+double duration;
 
 void MainHandler(void *arg) {
-  uint64_t* cnt;
-  log_info("SHM_KEY: %d, threads: %d\n", SHM_KEY, threads);
-  int shm_id = shmget((key_t) SHM_KEY, threads*sizeof(uint64_t), 0);
-  if (shm_id == -1) {
-    log_err("failed to get shm_id from key: %d in stress.cc", SHM_KEY);
-    printf("Something went wrong with shmget()! %s\n", strerror(errno));
-    printf("actual errno: %d\n", errno);
-    exit(1);
-  }
-  void* shm_ptr = shmat(shm_id, 0, 0);
-  if (shm_ptr == (void*) -1) {
-    log_err("failed to get shm_id in stress.cc");
-    exit(1);
-  }
-  cnt = (uint64_t*) shm_ptr;
-  shmctl(shm_id, IPC_RMID, NULL); // mark for removal early, because we will kill this process
 
-  rt::WaitGroup wg(1);
-
-  barrier_init(&barrier, threads);
-
-  // rt::Spawn([&]() {
-  //   uint64_t last_total = 0;
-  //   double track_time = 0;
-  //   std::chrono::duration<double> one_second_interval(1);
-  //   auto last = std::chrono::steady_clock::now();
-    
-  //   while (1) {
-  //     // rt::Sleep(rt::kSeconds);
-  //     auto now = std::chrono::steady_clock::now();
-  //     if (now - last < one_second_interval) {
-  //       continue;
-  //     }
-  //     uint64_t total = 0;
-  //     double duration =
-  //         std::chrono::duration_cast<std::chrono::duration<double>>(now - last)
-  //             .count();
-  //     for (int i = 0; i < threads; i++) total += cnt[i];
-  //     preempt_disable();
-  //     log_info("%f,%f", track_time, static_cast<double>(total - last_total) / duration);
-  //     fflush(stdout);
-  //     // std::cout << track_time << "," << static_cast<double>(total - last_total) / duration) << std::endl;
-  //     preempt_enable();
-  //     track_time += duration;
-  //     last_total = total;
-  //     last = now;
-  //   }
-  // });
-
-  for (int i = 0; i < threads; ++i) {
-    rt::Spawn([&, i]() {
-      auto *w = SyntheticWorkerFactory(worker_spec);
-      if (w == nullptr) {
-        std::cerr << "Failed to create worker." << std::endl;
+    uint64_t* cnt;
+    log_info("SHM_KEY: %d, threads: %d\n", SHM_KEY, threads);
+    int shm_id = shmget((key_t) SHM_KEY, 0, 0600);
+    if (shm_id == -1) {
+        log_err("failed to get shm_id from key: %d in stress.cc", SHM_KEY);
+        printf("Something went wrong with shmget()! %s\n", strerror(errno));
+        printf("actual errno: %d\n", errno);
         exit(1);
-      }
+    }
+    void* shm_ptr = shmat(shm_id, 0, 0);
+    if (shm_ptr == (void*) -1) {
+        log_err("failed to get shm_id in stress.cc");
+        exit(1);
+    }
+    cnt = (uint64_t*) shm_ptr;
 
-      while (true) {
-        w->Work(n);
-        cnt[i]++;
-        rt::Yield();
-      }
-    });
-  }
+    rt::WaitGroup wg(1);
 
-  
+    barrier_init(&barrier, threads);
 
-  // never returns
-  wg.Wait();
+    for (int i = 0; i < threads; ++i) {
+        rt::Spawn([&, i]() {
+                auto *w = SyntheticWorkerFactory(worker_spec);
+                if (w == nullptr) {
+                    std::cerr << "Failed to create worker." << std::endl;
+                    exit(1);
+                }
+
+                cnt[i] = 0;
+                while (true) {
+                    w->Work(n);
+                    cnt[i]++;
+                    rt::Yield();
+                }
+            });
+    }
+
+    // never returns
+    wg.Wait();
 }
 
 }  // anonymous namespace
@@ -102,23 +78,120 @@ void MainHandler(void *arg) {
 int main(int argc, char *argv[]) {
   int ret;
 
-  if (argc != 6) {
-    std::cerr << "usage: [config_file] [SHM_KEY] [#threads] [#n] [worker_spec]"
-              << std::endl;
-    return -EINVAL;
+  if (argc < 3) {
+      printf("usage: [config] [init/work/dump/deinit] [additional args...]\n");
+      return -1;
   }
 
-  SHM_KEY = std::stoi(argv[2], nullptr, 0);
-  threads = std::stoi(argv[3], nullptr, 0);
-  n = std::stoul(argv[4], nullptr, 0);
-  worker_spec = std::string(argv[5]);
+  mode = std::string(argv[2]);
 
-  std::cout << std::setprecision(8) << std::fixed;
+  if (mode == "init") {
+      if (argc != 5) {
+          printf("usage: [config] [init] [SHM_KEY] [#threads]\n");
+          return -1;
+      }
+      SHM_KEY = std::stoi(argv[3]);
+      threads = std::stoi(argv[4]);
 
-  ret = runtime_init(argv[1], MainHandler, NULL);
-  if (ret) {
-    printf("failed to start runtime\n");
-    return ret;
+        int shm_id = shmget((key_t) SHM_KEY, sizeof(uint64_t)*threads, IPC_CREAT | 0600);
+        if (shm_id == -1) {
+            printf("Failed to create the shared memory region: %s\n", strerror(errno));
+            return -1;
+        }
+        void* shm_ptr = shmat(shm_id, 0, 0);
+        if (shm_ptr == (void *)-1) {
+            printf("Failed to attach the shared memory region: %s\n", strerror(errno));
+            return -1;
+        }
+        uint64_t *cnt = (uint64_t *)shm_ptr;
+        for (int i = 0; i < threads; i++) {
+            cnt[i] = 0;
+        }
+
+        // Block forever
+        int ret;
+        int pipefd[2];
+        ret = pipe(pipefd);
+        if (ret == -1) {
+            printf("Failed to create a pipe\n");
+            return -1;
+        }
+        char dummy;
+        ret = read(pipefd[0], &dummy, sizeof(char));
+        if (ret <= 0) {
+            printf("Read on a pipe failed\n");
+            return -1;
+        }
+
+        return 0;
+
+  } else if (mode == "deinit") {
+      if (argc != 4) {
+          printf("usage: [config] [deinit] [SHM_KEY]\n");
+          return -1;
+      }
+      SHM_KEY = std::stoi(argv[3]);
+
+      int shm_id = shmget((key_t) SHM_KEY, 0, 0600);
+      if (shm_id == -1) {
+          printf("Failed to get the shared memory region: %s\n", strerror(errno));
+          return -1;
+      }
+      shmctl(shm_id, IPC_RMID, NULL);
+      return 0;
+
+  } else if (mode == "dump") {
+      if (argc != 6) {
+          printf("usage: [config] [dump] [SHM_KEY] [#threads] [duration]\n");
+          return -1;
+      }
+      SHM_KEY = std::stoi(argv[3]);
+      threads = std::stoi(argv[4]);
+      duration = std::stod(argv[5]);
+
+      int shm_id = shmget((key_t) SHM_KEY, 0, 0600);
+      if (shm_id == -1) {
+          printf("Failed to get the shared memory region: %s\n", strerror(errno));
+          return -1;
+      }
+      assert(shm_id != -1);
+      void* shm_ptr = shmat(shm_id, 0, 0);
+      if (shm_ptr == (void *)-1) {
+          printf("Failed to attach the shared memory region: %s\n", strerror(errno));
+          return -1;
+      }
+      uint64_t* cnt = (uint64_t *)shm_ptr;
+      uint64_t total = 0;
+      for (int i = 0; i < threads; i++) {
+          total += cnt[i];
+      }
+      printf("%lf, %lf\n", (double)total/duration, duration);
+      shmdt(shm_ptr);
+      return 0;
+
+  } else if (mode == "work") {
+      if (argc != 7) {
+          printf("usage: [config] [work] [SHM_KEY] [#threads] [#work_units] [#work_spec]\n");
+          return -1;
+      }
+      SHM_KEY = std::stoi(argv[3]);
+      threads = std::stoi(argv[4]);
+      n = std::stoul(argv[5], nullptr, 0);
+      worker_spec = std::string(argv[6]);
+
+      std::cout << std::setprecision(8) << std::fixed;
+
+      ret = runtime_init(argv[1], MainHandler, NULL);
+      if (ret) {
+          printf("failed to start runtime\n");
+          return ret;
+      }
+
+      return 0;
+
+  } else {
+      printf("usage: [config] [init/work/dump/deinit] [additional args...]\n");
+      return -1;
   }
 
   return 0;

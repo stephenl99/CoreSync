@@ -20,7 +20,7 @@
 */
 
 /* delay threshold for AQM */
-#define SBW_LATENCY_BUDGET		160
+#define SBW_LATENCY_BUDGET			160
 
 #define SRPC_CM_SLOPE_THRESH		0.2
 #define SRPC_CM_SLOPE_INV		4

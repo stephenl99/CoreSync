@@ -23,9 +23,10 @@
 #include "bw_config.h"
 #include "bw2_config.h"
 
-// #include <bw_server.h>
 extern atomic_t srpc_credit_pool;
 extern atomic_t srpc_credit_used;
+extern atomic_t srpc_num_sess;
+extern atomic_t srpc_num_drained;
 
 /* time-series output */
 #define SBW_TS_OUT		false
@@ -64,25 +65,11 @@ static struct Event events[TS_BUF_SIZE];
 /* the handler function for each RPC */
 static srpc_fn_t srpc_handler;
 
-/* total number of session */
-atomic_t srpc_num_sess;
-
-/* the number of drained session */
-atomic_t srpc_num_drained;
-
 /* the number of active sessions */
 atomic_t srpc_num_active;
 
-/* global credit pool */
-// moving definition to runtime/sched.c for breakwater parking
-// atomic_t srpc_credit_pool;
-
 /* timestamp of the latest credit pool update */
 uint64_t srpc_last_cp_update;
-
-/* global credit used */
-// moving definition to runtime/sched.c for breakwater parking
-// atomic_t srpc_credit_used;
 
 /* downstream credit for multi-hierarchy */
 atomic_t srpc_credit_ds;
@@ -370,8 +357,11 @@ static void srpc_update_credit(struct sbw_session *s, bool req_dropped)
 	atomic_fetch_and_add(&srpc_credit_used, credit_diff);
 #if SBW_TRACK_FLOW
 	if (s->id == SBW_TRACK_FLOW_ID) {
-		printf("[%lu] credit update: credit_pool = %d, credit_used = %d, req_dropped = %d, num_pending = %d, demand = %d, num_sess = %d, old_credit = %d, new_credit = %d\n",
-		       microtime(), credit_pool, credit_used, req_dropped, s->num_pending, s->demand, num_sess, old_credit, s->credit);
+		printf("[%lu] credit update: credit_pool = %d, credit_used = %d, "
+               "req_dropped = %d, num_pending = %d, demand = %d, "
+               "num_sess = %d, old_credit = %d, new_credit = %d\n",
+		       microtime(), credit_pool, credit_used, req_dropped,
+               s->num_pending, s->demand, num_sess, old_credit, s->credit);
 	}
 #endif
 }
@@ -637,11 +627,6 @@ static void srpc_handle_req_drop(uint64_t qus)
 	srpc_last_cp_update = now;
 	new_cp = decr_credit_pool(qus);
 	atomic_write(&srpc_credit_pool, new_cp);
-
-// #if SBW_TS_OUT
-// 	record(new_cp, qus);
-// #endif
-// TODO decide if we need this.
 }
 
 static void srpc_worker(void *arg)
@@ -669,20 +654,7 @@ static void srpc_worker(void *arg)
 		atomic_write(&srpc_avg_st, avg_st);
 		atomic_write(&srpc_credit_ds, c->cmn.ds_credit);
 	}
-/*
-	c->cmn.drop = false;
 
-	if (!c->cmn.drop) {
-		service_time = microtime();
-		srpc_handler((struct srpc_ctx *)c);
-		service_time = microtime() - service_time;
-		avg_st = atomic_read(&srpc_avg_st);
-		avg_st = (uint64_t)(avg_st - (avg_st >> 3) + (service_time >> 3));
-
-		atomic_write(&srpc_avg_st, avg_st);
-		atomic_write(&srpc_credit_ds, c->cmn.ds_credit);
-	}
-*/
 	spin_lock_np(&s->lock);
 	bitmap_set(s->completed_slots, c->cmn.idx);
 	th = s->sender_th;
@@ -1197,27 +1169,6 @@ uint64_t sbw_stat_resp_tx()
 {
 	return atomic64_read(&srpc_stat_resp_tx_);
 }
-
-// caladan-overload-control
-
-// int get_breakwater_srpc_credit_used() {
-// 	return atomic_read(&srpc_credit_used);
-// }
-
-// void notify_breakwater_parking(int* old_C_issued, int* breakwater_park_target) {
-// 	int curr_cores = runtime_active_cores();
-// 	int credit_pool = atomic_read(&srpc_credit_pool);
-// 	// this minimum for credits (max cores) is used throughout breakwater implementation
-// 	int new_credit_pool = (int) (SBW_CORE_PARK_TARGET * (credit_pool - (credit_pool / curr_cores)));
-// 	new_credit_pool = MAX(runtime_max_cores(), new_credit_pool);
-// 	*old_C_issued = atomic_read(&srpc_credit_used);
-// 	atomic_write(&srpc_credit_pool, new_credit_pool);
-// 	*breakwater_park_target = credit_pool - new_credit_pool;
-// }
-
-// void notify_breakwater_found_work(int restore) {
-// 	atomic_fetch_and_add(&srpc_credit_pool, restore);
-// }
 
 struct srpc_ops sbw_ops = {
 	.srpc_enable		= sbw_enable,

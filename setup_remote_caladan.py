@@ -94,10 +94,14 @@ cmd = "cd ~/{}/{}/breakwater && make clean && make -j16 &&"\
 execute_remote(conns, cmd, True)
 
 # TODO actually might not work in build scripts, since I think breakwater needs to be built first
-print("Setting up memcahced...")
+print("Setting up memcached...")
 cmd = "cd ~/{}/memcached && ./version.sh && autoreconf -i"\
         " && ./configure --with-shenango=../{} && make clean && make"\
         .format(ARTIFACT_PATH, KERNEL_NAME)
 execute_remote(conns, cmd, True)
+
+# Copy the config and utility files to the ICNP test scripts folder
+cmd = "cp config_remote.py util.py ./icnp_2025_scripts"
+execute_local(cmd)
 
 print("Done.")

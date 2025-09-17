@@ -7,21 +7,21 @@
 /* Recommended parameters (in XL170 environment)
 * - 1 us average service time
 * #define SBW_MIN_DELAY_US		45
-* #define SBW_DROP_THRESH		90
+* #define SBW_DROP_THRESH			160
 *
 * - 10 us average service time
 * #define SBW_MIN_DELAY_US		80
-* #define SBW_DROP_THRESH		160
+* #define SBW_DROP_THRESH			160
 *
 * - 100 us average service time
 * #define SBW_MIN_DELAY_US		500
-* #define SBW_DROP_THRESH		1000
+* #define SBW_DROP_THRESH			160
 */
 
 /* delay threshold to detect congestion */
-#define SBW_DELAY_TARGET		45
+#define SBW_DELAY_TARGET			80
 /* delay threshold for AQM */
-#define SBW_DROP_THRESH			90
+#define SBW_DROP_THRESH			160
 
 /* round trip time in us */
 #define SBW_RTT_US			10

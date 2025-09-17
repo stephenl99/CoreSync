@@ -8,6 +8,13 @@ extern "C" {
 #include <breakwater/dagor.h>
 #include <breakwater/nocontrol.h>
 #include <breakwater/sync.h>
+#include <runtime/runtime.h>
+
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
 }
 
 #include "cc/net.h"
@@ -87,13 +94,23 @@ constexpr uint64_t kNumDupClient = 32;
 std::vector<double> offered_loads;
 double offered_load;
 
+#define CAPACITY 1300000.0
+
+
 // for shorter exp duration, 4 seconds total
-std::vector<std::pair<double, uint64_t>> rates = {{400000, 2500000}, {1400000, 500000}, {850000, 500000}, 
-                                                  {1400000, 500000}};
+// std range for 1us
+// std::vector<std::pair<double, uint64_t>> rates = {{100000, 3000000}, {100000, 1000000}, {300000, 1000000}, {500000, 1000000}, {1000000, 1000000}, {3000000, 1000000}, {4000000, 1000000}, {100000, 1000000}};
+
+// aux range for 1us
+// std::vector<std::pair<double, uint64_t>> rates = {{100000, 3000000}, {100000, 1000000}, {1500000, 1000000}, {2000000, 1000000}, {2500000, 1000000}};
+
+// std range for 10us
+// std::vector<std::pair<double, uint64_t>> rates = {{100000, 3000000}, {100000, 1000000}, {300000, 1000000}, {500000, 1000000}, {1000000, 1000000}, {3000000, 1000000}, {100000, 1000000}};
+    std::vector<std::pair<double, uint64_t>> rates = {{CAPACITY * 0.6, 4000000}, {CAPACITY * 0.9, 4000000}, {CAPACITY * 1.2, 4000000}, {CAPACITY * 1.5, 4000000}};
 
 // std::vector<std::pair<double, uint64_t>> rates = {{875000, 4000000}};
 
-// std::vector<std::pair<double, uint64_t>> rates = {{400000, 4500000}, {1400000, 500000}, {850000, 1500000}, 
+// std::vector<std::pair<double, uint64_t>> rates = {{400000, 4500000}, {1400000, 500000}, {850000, 1500000},
 //                                                   {1400000, 500000}, {400000, 1000000}};
 
 /// ERIC
@@ -121,7 +138,7 @@ rpc::FanOuter<payload, PAYLOAD_ID_OFF> *fan_outer;
 constexpr uint64_t kRPCSStatPort = 8002;
 constexpr uint64_t kRPCSStatMagic = 0xDEADBEEF;
 struct sstat_raw {
-  uint64_t idle;
+  uint64_t total;
   uint64_t busy;
   unsigned int num_cores;
   unsigned int max_cores;
@@ -142,6 +159,13 @@ struct shstat_raw {
   uint64_t tx_bytes;
   uint64_t drops;
   uint64_t rx_tcp_ooo;
+  uint64_t sched_cycles;
+  uint64_t program_cycles;
+  uint64_t parks;
+  uint64_t reschedules;
+  uint64_t core_migrations;
+  uint64_t local_runs;
+  uint64_t remote_runs;
 };
 
 struct sstat {
@@ -158,6 +182,13 @@ struct sstat {
   double req_rx_pps;
   double req_drop_rate;
   double resp_tx_pps;
+  uint64_t sched_cycles;
+  uint64_t program_cycles;
+  uint64_t parks;
+  uint64_t reschedules;
+  uint64_t core_migrations;
+  uint64_t local_runs;
+  uint64_t remote_runs;
 };
 
 /* client-side stat */
@@ -369,18 +400,39 @@ void RPCSStatWorker(std::unique_ptr<rt::TcpConn> c) {
     // Check for the right magic value.
     if (ntoh64(magic) != kRPCSStatMagic) break;
 
-    // Calculate the current uptime.
-    std::ifstream file("/proc/stat");
-    std::string line;
-    std::getline(file, line);
-    std::istringstream ss(line);
-    std::string tmp;
-    uint64_t user, nice, system, idle, iowait, irq, softirq, steal, guest,
-        guest_nice;
-    ss >> tmp >> user >> nice >> system >> idle >> iowait >> irq >> softirq >>
-        steal >> guest >> guest_nice;
-    sstat_raw u = {idle + iowait,
-                   user + nice + system + irq + softirq + steal,
+    int fd;
+    char buffer[1024];
+    uint64_t busy = 0;
+    uint64_t total = 0;
+    char *token = NULL;
+
+    /* Calculate the cycles spent by this process */
+    fd = open("/proc/self/stat", O_RDONLY);
+    assert(fd != -1);
+    ret = read(fd, buffer, sizeof(buffer) - 1);
+    assert(ret >= 0);
+    buffer[ret] = '\0';
+    for (int i = 1; i <= 15; i++) {
+        token = strtok(i == 1 ? buffer : NULL, " ");
+        assert(token);
+        if (i == 14) busy += (uint64_t)atol(token);
+        if (i == 15) busy += (uint64_t)atol(token);
+    }
+
+    /* Calculate the total cycles spent */
+    fd = open("/proc/stat", O_RDONLY);
+    assert(fd != -1);
+    ret = read(fd, buffer, sizeof(buffer) - 1);
+    assert(ret >= 0);
+    buffer[ret] = '\0';
+    for (int i = 1; i <= 8; i++) {
+        token = strtok(i == 1 ? buffer : NULL, " ");
+        assert(token);
+        total += (uint64_t)atol(token);
+    }
+
+    sstat_raw u = {total,
+                   busy,
                    rt::RuntimeMaxCores(),
                    static_cast<unsigned int>(sysconf(_SC_NPROCESSORS_ONLN)),
                    rpc::RpcServerStatCupdateRx(),
@@ -424,7 +476,7 @@ sstat_raw ReadRPCSStat() {
   ret = c->ReadFull(&u, sizeof(u));
   if (ret != static_cast<ssize_t>(sizeof(u)))
     panic("sstat response failed, ret = %ld", ret);
-  return sstat_raw{u.idle, u.busy, u.num_cores, u.max_cores, u.cupdate_rx,
+  return sstat_raw{u.total, u.busy, u.num_cores, u.max_cores, u.cupdate_rx,
                    u.ecredit_tx, u.credit_tx, u.req_rx, u.req_dropped, u.resp_tx};
 }
 
@@ -475,7 +527,10 @@ shstat_raw ReadShenangoStat() {
 
   return shstat_raw{smap["rx_packets"], smap["tx_packets"],
                     smap["rx_bytes"],   smap["tx_bytes"],
-                    smap["drops"],      smap["rx_tcp_out_of_order"]};
+                    smap["drops"],      smap["rx_tcp_out_of_order"],
+                    smap["sched_cycles"], smap["program_cycles"],
+                    smap["parks"], smap["reschedules"],
+          smap["core_migrations"], smap["local_runs"], smap["remote_runs"]};
 }
 
 constexpr uint64_t kNetbenchPort = 8001;
@@ -528,6 +583,7 @@ void RpcServer(struct srpc_ctx *ctx) {
   payload *out = reinterpret_cast<payload *>(ctx->resp_buf);
   memcpy(out, in, sizeof(*out));
   out->tsc_end = hton64(rdtscp(&out->cpu));
+  //out->cpu = hton32(runtime_active_cores());//hton32(out->cpu);
   out->cpu = hton32(out->cpu);
   out->server_queue = hton64(rt::RuntimeQueueUS());
 }
@@ -1082,14 +1138,9 @@ std::vector<work_unit> RunExperiment(
   }
 
   if ((!b || b->IsLeader()) && ss) {
-    uint64_t idle = s2.idle - s1.idle;
+    uint64_t total = s2.total - s1.total;
     uint64_t busy = s2.busy - s1.busy;
-    ss->cpu_usage =
-        static_cast<double>(busy) / static_cast<double>(idle + busy);
-
-    ss->cpu_usage =
-        (ss->cpu_usage - 1 / static_cast<double>(s1.max_cores)) /
-        (static_cast<double>(s1.num_cores) / static_cast<double>(s1.max_cores));
+    ss->cpu_usage = static_cast<double>(busy) / static_cast<double>(total);
 
     uint64_t cupdate_rx_pkts = s2.cupdate_rx - s1.cupdate_rx;
     uint64_t ecredit_tx_pkts = s2.ecredit_tx - s1.ecredit_tx;
@@ -1111,12 +1162,26 @@ std::vector<work_unit> RunExperiment(
     uint64_t tx_bytes = sh2.tx_bytes - sh1.tx_bytes;
     uint64_t drops = sh2.drops - sh1.drops;
     uint64_t rx_tcp_ooo = sh2.rx_tcp_ooo - sh1.rx_tcp_ooo;
+    uint64_t sched_cycles = sh2.sched_cycles - sh1.sched_cycles;
+    uint64_t program_cycles = sh2.program_cycles - sh1.program_cycles;
+    uint64_t parks = sh2.parks - sh1.parks;
+    uint64_t reschedules = sh2.reschedules - sh1.reschedules;
+    uint64_t core_migrations = sh2.core_migrations - sh1.core_migrations;
+    uint64_t local_runs = sh2.local_runs - sh1.local_runs;
+    uint64_t remote_runs = sh2.remote_runs - sh1.remote_runs;
     ss->rx_pps = static_cast<double>(rx_pkts) / elapsed_ * 1000000;
     ss->tx_pps = static_cast<double>(tx_pkts) / elapsed_ * 1000000;
     ss->rx_bps = static_cast<double>(rx_bytes) / elapsed_ * 8000000;
     ss->tx_bps = static_cast<double>(tx_bytes) / elapsed_ * 8000000;
     ss->rx_drops_pps = static_cast<double>(drops) / elapsed_ * 1000000;
     ss->rx_ooo_pps = static_cast<double>(rx_tcp_ooo) / elapsed_ * 1000000;
+    ss->sched_cycles = sched_cycles;
+    ss->program_cycles = program_cycles;
+    ss->parks = parks;
+    ss->reschedules = reschedules;
+    ss->core_migrations = core_migrations;
+    ss->local_runs = local_runs;
+    ss->remote_runs = remote_runs;
   }
 
   *elapsed = elapsed_;
@@ -1156,6 +1221,13 @@ void PrintHeader(std::ostream &os) {
      << "server:tx_bps,"
      << "server:rx_drops_pps,"
      << "server:rx_ooo_pps,"
+     << "server:sched_cycles,"
+     << "server:program_cycles,"
+     << "server:parks,"
+     << "server:reschedules,"
+     << "server:core_migrations,"
+     << "server:local_runs,"
+     << "server:remote_runs,"
      << "server:cupdate_rx_pps,"
      << "server:ecredit_tx_pps,"
      << "server:credit_tx_cps,"
@@ -1328,7 +1400,11 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
 	    << mean_que << "," << p99_que << "," << mean_stime << ","
 	    << p99_stime << "," << ss->rx_pps << "," << ss->tx_pps << ","
 	    << ss->rx_bps << "," << ss->tx_bps << "," << ss->rx_drops_pps << ","
-	    << ss->rx_ooo_pps << "," << ss->cupdate_rx_pps << ","
+	    << ss->rx_ooo_pps << "," << ss->sched_cycles << ","
+        << ss->program_cycles << "," << ss->parks << ","
+        << ss->reschedules << "," << ss->core_migrations << ","
+        << ss->local_runs << "," << ss->remote_runs << ","
+        << ss->cupdate_rx_pps << ","
 	    << ss->ecredit_tx_pps << "," << ss->credit_tx_cps << ","
 	    << ss->req_rx_pps << "," << ss->req_drop_rate << ","
 	    << ss->resp_tx_pps << ","
@@ -1349,7 +1425,11 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
 	  << mean_que << "," << p99_que << "," << mean_stime << ","
 	  << p99_stime << "," << ss->rx_pps << "," << ss->tx_pps << ","
 	  << ss->rx_bps << "," << ss->tx_bps << "," << ss->rx_drops_pps << ","
-	  << ss->rx_ooo_pps << "," << ss->cupdate_rx_pps << ","
+	  << ss->rx_ooo_pps << "," << ss->sched_cycles << ","
+      << ss->program_cycles << "," << ss->parks << ","
+      << ss->reschedules << "," << ss->core_migrations << ","
+      << ss->local_runs << "," << ss->remote_runs << ","
+      << ss->cupdate_rx_pps << ","
 	  << ss->ecredit_tx_pps << "," << ss->credit_tx_cps << ","
 	  << ss->req_rx_pps << "," << ss->req_drop_rate << ","
 	  << ss->resp_tx_pps << ","
@@ -1391,6 +1471,13 @@ void PrintStatResults(std::vector<work_unit> w, struct cstat *cs,
            << "\"server:tx_bps\":" << ss->tx_bps << ","
            << "\"server:rx_drops_pps\":" << ss->rx_drops_pps << ","
            << "\"server:rx_ooo_pps\":" << ss->rx_ooo_pps << ","
+     	   << "\"server:sched_cycles\":" << ss->sched_cycles << ","
+    	   << "\"server:program_cycles\":" << ss->program_cycles << ","
+	       << "\"server:parks\":" << ss->parks << ","
+	       << "\"server:reschedules\":" << ss->reschedules << ","
+	       << "\"server:core_migrations\":" << ss->core_migrations << ","
+	       << "\"server:local_runs\":" << ss->local_runs << ","
+	       << "\"server:remote_runs\":" << ss->remote_runs << ","
            << "\"server:cupdate_rx_pps\":" << ss->cupdate_rx_pps << ","
            << "\"server:ecredit_tx_pps\":" << ss->ecredit_tx_pps << ","
            << "\"server:credit_tx_cps\":" << ss->credit_tx_cps << ","
