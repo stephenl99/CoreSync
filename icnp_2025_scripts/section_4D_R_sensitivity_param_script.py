@@ -10,7 +10,7 @@ import random
 import sys
 
 if len(sys.argv) < 2:
-    print("usage: param_run_synthetic_antagonist.py <policy>")
+    print("usage: section_4D_R_sensitivity_param_script.py <policy>")
     sys.exit(1)
 
 ################################
@@ -829,12 +829,6 @@ if CORESYNC_ENABLE:
 
 cmd = "echo \"{}\" > {}/script.config".format(script_config, config_dir)
 execute_local(cmd)
-
-# produce the cores if applicable
-if IAS_DEBUG and not AVOID_LARGE_DOWNLOADS:
-    print("creating cores csv")
-    cmd = "cd {} && python3 ../../../graph_scripts/create_corecsv.py".format(run_dir)
-    execute_local(cmd)
 
 if CSV_NAME_DIR:
     os.chdir(output_dir)

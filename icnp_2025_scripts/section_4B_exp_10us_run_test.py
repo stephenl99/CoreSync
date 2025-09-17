@@ -4,8 +4,12 @@ import os
 from time import sleep, time
 import sys
 
+if len(sys.argv) < 2:
+    print("usage: section_4B_exp_10us_run_test.py <output_dir>")
+    sys.exit(1)
+
 # Directory to store the test results
-OUTPUT_DIR = "/proj/cc-profiler-PG0/users/bpardeshi3/understanding_before_icnp/"
+OUTPUT_DIR = "{}/{}".format(sys.argv[1], "section_4B_exp_10us")
 
 # Remove the output directory if it exists
 os.system("sudo rm -rf {}".format(OUTPUT_DIR))
@@ -15,14 +19,14 @@ os.system("sudo mkdir -p {}".format(OUTPUT_DIR))
 
 # Core allocation policies to test
 POLICIES = [
-    # "shenango",
-    # "caladan1",
-    # "util_range",
-    # "delay_range1",
+    "shenango",
+    "caladan1",
+    "util_range",
+    "delay_range1",
     "coresync1",
-    # "coresync2",
-    # "coresync3",
-    # "coresync4",
+    "coresync2",
+    "coresync3",
+    "coresync4",
 ]
 
 # Run the tests

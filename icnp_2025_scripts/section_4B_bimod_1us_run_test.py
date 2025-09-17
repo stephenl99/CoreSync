@@ -4,8 +4,12 @@ import os
 from time import sleep, time
 import sys
 
+if len(sys.argv) < 2:
+    print("usage: section_4B_bimod_1us_run_test.py <output_dir>")
+    sys.exit(1)
+
 # Directory to store the test results
-OUTPUT_DIR = "/path/to/your/directory"
+OUTPUT_DIR = "{}/{}".format(sys.argv[1], "section_4B_bimod_1us")
 
 # Remove the output directory if it exists
 os.system("sudo rm -rf {}".format(OUTPUT_DIR))

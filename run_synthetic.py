@@ -10,7 +10,7 @@ import random
 import sys
 
 if len(sys.argv) < 2:
-    print("usage: section_4B_bimod_10us_param_script.py <policy>")
+    print("usage: run_synthetic.py <policy>")
     sys.exit(1)
 
 
@@ -182,7 +182,7 @@ ST_AVG = 10
 #    exp: exponential
 #    const: constant
 #    bimod: bimodal
-ST_DIST = "bimod"
+ST_DIST = "exp"
 
 # SLO = 10 * (average RPC processing time + network RTT)
 NET_RTT = 10
@@ -240,24 +240,24 @@ ANTON_WORK_PARAM = "randmem:{:d}:{:d}".format(ANTON_MEMSIZE, ANTON_RANDOM_SEED)
 # Update the config
 print("modifying bw_config.h values for target and threshold")
 cmd = "sed -i \'s/#define SBW_DELAY_TARGET.*/#define SBW_DELAY_TARGET\\t\\t\\t{:d}/g\'"\
-        " ../configs/bw_config.h".format(BW_TARGET)
+        " ./configs/bw_config.h".format(BW_TARGET)
 execute_local(cmd)
 cmd = "sed -i \'s/#define SBW_DROP_THRESH.*/#define SBW_DROP_THRESH\\t\\t\\t{:d}/g\'"\
-        " ../configs/bw_config.h".format(BW_THRESHOLD)
+        " ./configs/bw_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
 cmd = "sed -i \'s/#define SBW_LATENCY_BUDGET.*/#define SBW_LATENCY_BUDGET\\t\\t\\t{:d}/g\'"\
-        " ../configs/bw2_config.h".format(BW_THRESHOLD)
+        " ./configs/bw2_config.h".format(BW_THRESHOLD)
 execute_local(cmd)
 
 # Update the code to enable downloading all tasks
 if DOWNLOAD_ALL_TASKS:
     cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t true/g\'"\
-        " ../replace/netbench.cc"
+        " ./replace/netbench.cc"
     execute_local(cmd)
 else:
     cmd = "sed -i \'s/#define ENABLE_DOWNLOAD_ALL_TASKS.*/#define ENABLE_DOWNLOAD_ALL_TASKS\\t\\t\\t false/g\'"\
-        " ../replace/netbench.cc"
+        " ./replace/netbench.cc"
     execute_local(cmd)
 
 # Verify configs #
@@ -373,18 +373,18 @@ execute_remote([server_conn, client_conn], cmd, True, False)
 # Distribuing config files
 print("Distributing configs...")
 # - server
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../configs/*.h"\
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./configs/*.h"\
         " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
         .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
 # - client
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../configs/*.h"\
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./configs/*.h"\
         " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
         .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
 # - agents
 for agent in AGENTS:
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../configs/*.h"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./configs/*.h"\
             " {}@{}:~/{}/{}/breakwater/src/ >/dev/null"\
             .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
@@ -393,45 +393,44 @@ for agent in AGENTS:
 if IAS_DEBUG:
     print("Replacing ias.h")
     # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/ias.h"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/ias.h"\
             " {}@{}:~/{}/{}/iokernel/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
 if True:
     print("replacing bw_server.c")
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/bw_server.c"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/bw_server.c"\
             " {}@{}:~/{}/{}/breakwater/src/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
     print("replacing runtime defs.h")
     cmd = "sed -i \'s/#define RUNTIME_SCHED_MIN_POLL_US.*/#define RUNTIME_SCHED_MIN_POLL_US\\t\\t\\t{:d}/g\'"\
-          " ../replace/defs.h".format(CALADAN_SCHED_POLL)
+          " ./replace/defs.h".format(CALADAN_SCHED_POLL)
     execute_local(cmd)
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/defs.h"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/defs.h"\
             " {}@{}:~/{}/{}/runtime/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
     print("replacing runtime sched.c")
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/sched.c"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/sched.c"\
             " {}@{}:~/{}/{}/runtime/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
     print("replacing runtime kthread.c")
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/kthread.c"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/kthread.c"\
             " {}@{}:~/{}/{}/runtime/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
     print("replacing runtime cfg.c")
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/cfg.c"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/cfg.c"\
             " {}@{}:~/{}/{}/runtime/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
-
 
 # Generating config files
 print("Generating config files...")
@@ -448,25 +447,25 @@ for i in range(NUM_AGENT):
                              gateway, NUM_CORES_CLIENT, ENABLE_DIRECTPATH, True, False)
 
 # - server
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/netbench.cc"\
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/netbench.cc"\
         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
         .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
 # - client
-cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/netbench.cc"\
+cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/netbench.cc"\
         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
         .format(KEY_LOCATION, USERNAME, CLIENT, ARTIFACT_PATH, KERNEL_NAME)
 execute_local(cmd)
 # - agents
 for agent in AGENTS:
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/netbench.cc"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/netbench.cc"\
         " {}@{}:~/{}/{}/breakwater/apps/netbench/ >/dev/null"\
         .format(KEY_LOCATION, USERNAME, agent, ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
 
 if ENABLE_ANTAGONIST:
     # - server
-    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ../replace/stress.cc"\
+    cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no ./replace/stress.cc"\
             " {}@{}:~/{}/{}/apps/netbench/"\
             .format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, KERNEL_NAME)
     execute_local(cmd)
@@ -631,6 +630,7 @@ for offered_load in OFFERED_LOADS:
 
     idx += 1
 
+
 # Kill IOKernel
 cmd = "sudo killall -9 iokerneld"
 execute_remote([server_conn, client_conn] + agent_conns, cmd, True)
@@ -702,6 +702,7 @@ header = "num_clients,offered_load,throughput,goodput,cpu"\
         ",p1_credit,mean_credit,p99_credit"\
         ",p1_q,mean_q,p99_q,mean_stime,p99_stime,server:rx_pps,server:tx_pps"\
         ",server:rx_bps,server:tx_bps,server:rx_drops_pps,server:rx_ooo_pps"\
+        ",server:sched_cycles,server:program_cycles,server:parks,server:reschedules,server:core_migrations,server:local_runs,server:remote_runs"\
         ",server:cupdate_rx_pps,server:ecredit_tx_pps,server:credit_tx_cps"\
         ",server:req_rx_pps,server:req_drop_rate,server:resp_tx_pps"\
         ",client:min_tput,client:max_tput"\
@@ -729,6 +730,7 @@ if ENABLE_ANTAGONIST:
 # Remove temp outputs
 cmd = "rm output.csv"
 execute_local(cmd, False)
+
 
 # TODO put these all in one folder on server so I can just fetch with one command
 if not IAS_DEBUG or not AVOID_LARGE_DOWNLOADS:
@@ -770,7 +772,7 @@ if ENABLE_ANTAGONIST:
     cmd = "scp -P 22 -i {} -o StrictHostKeyChecking=no {}@{}:~/{}/antagonist.config {}/"\
         " >/dev/null".format(KEY_LOCATION, USERNAME, SERVERS[0], ARTIFACT_PATH, config_dir)
     execute_local(cmd)
-cmd = "cp ../configs/bw_config.h {}/ && cp ../configs/bw2_config.h {}/".format(config_dir, config_dir)
+cmd = "cp ./configs/bw_config.h {}/ && cp ./configs/bw2_config.h {}/".format(config_dir, config_dir)
 execute_local(cmd)
 script_config = "overload algorithm: {}\n".format(OVERLOAD_ALG)
 script_config += "number of nodes: {}\n".format(len(NODES))
