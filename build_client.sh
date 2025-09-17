@@ -7,7 +7,7 @@ SCRIPT=$(readlink -f "$0")
 SCRIPTPATH=$(dirname "$SCRIPT")
 echo "BASE_DIR = '${SCRIPTPATH}/'" > base_dir.py
 
-git submodule update --init -f --recursive caladan
+git submodule update --init -f --recursive caladan memcached
 
 if lspci | grep -q 'ConnectX-5'; then
  sed "s/CONFIG_MLX5=.*/CONFIG_MLX5=y/g" -i caladan/build/config
