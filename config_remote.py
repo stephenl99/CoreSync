@@ -1,19 +1,19 @@
 ###
 ### config_remote.py - configuration for remote servers
 ###
-# First node is "Server", second i think is "Lead client"
+# First node is lead client, second i think is server
 NODES = [
-    "slinder@hp083.utah.cloudlab.us",
-    "slinder@hp143.utah.cloudlab.us",
-    "slinder@hp120.utah.cloudlab.us",
+    "slinder@hp099.utah.cloudlab.us",
+    "slinder@hp059.utah.cloudlab.us",
     "slinder@hp043.utah.cloudlab.us",
+    "slinder@hp111.utah.cloudlab.us",
+    "slinder@hp192.utah.cloudlab.us",
     "slinder@hp041.utah.cloudlab.us",
-    "slinder@hp103.utah.cloudlab.us",
-    "slinder@hp130.utah.cloudlab.us",
-    "slinder@hp152.utah.cloudlab.us",
-    "slinder@hp155.utah.cloudlab.us",
-    "slinder@hp131.utah.cloudlab.us",
-    "slinder@hp133.utah.cloudlab.us"
+    "slinder@hp018.utah.cloudlab.us",
+    "slinder@hp006.utah.cloudlab.us",
+    "slinder@hp067.utah.cloudlab.us",
+    "slinder@hp013.utah.cloudlab.us",
+    "slinder@hp198.utah.cloudlab.us"
     
 ]
 
