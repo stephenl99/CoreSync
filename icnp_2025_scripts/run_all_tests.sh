@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OUTPUT_DIR="/path/to/your/output/directory"
+OUTPUT_DIR="/results/"
 
 echo "####################################################"
 echo "        Running Section 4-B (exponential 10us) Tests"
