@@ -3,17 +3,17 @@
 ###
 # First node is lead client, second i think is server
 NODES = [
-    "slinder@hp099.utah.cloudlab.us",
-    "slinder@hp059.utah.cloudlab.us",
-    "slinder@hp043.utah.cloudlab.us",
-    "slinder@hp111.utah.cloudlab.us",
-    "slinder@hp192.utah.cloudlab.us",
-    "slinder@hp041.utah.cloudlab.us",
-    "slinder@hp018.utah.cloudlab.us",
-    "slinder@hp006.utah.cloudlab.us",
-    "slinder@hp067.utah.cloudlab.us",
-    "slinder@hp013.utah.cloudlab.us",
-    "slinder@hp198.utah.cloudlab.us"
+    "hp099.utah.cloudlab.us",
+    "hp059.utah.cloudlab.us",
+    "hp043.utah.cloudlab.us",
+    "hp111.utah.cloudlab.us",
+    "hp192.utah.cloudlab.us",
+    "hp041.utah.cloudlab.us",
+    "hp018.utah.cloudlab.us",
+    "hp006.utah.cloudlab.us",
+    "hp067.utah.cloudlab.us",
+    "hp013.utah.cloudlab.us",
+    "hp198.utah.cloudlab.us"
     
 ]
 
